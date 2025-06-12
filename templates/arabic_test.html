@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقييم القراءة العربية</title>
+    <style>
+        body {
+            font-family: 'Arial Unicode MS', 'Tahoma', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            direction: rtl;
+            text-align: right;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        input, select, textarea, button {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            font-family: 'Arial Unicode MS', 'Tahoma', sans-serif;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .primary-btn {
+            background-color: #007bff;
+        }
+        .primary-btn:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+            direction: ltr;
+            text-align: left;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .arabic-text {
+            font-family: 'Arial Unicode MS', 'Tahoma', sans-serif;
+            font-size: 20px;
+            direction: rtl;
+            text-align: right;
+            line-height: 1.8;
+        }
+        .score-display {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .score-item {
+            text-align: center;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+            margin: 5px;
+            min-width: 120px;
+        }
+        .score-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .score-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #007bff, #28a745);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 36px;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            font-size: 18px;
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .grade-selector {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .grade-btn {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            color: #495057;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: auto;
+            min-width: 60px;
+        }
+        .grade-btn:hover, .grade-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .difficulty-selector {
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .difficulty-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            background: #f8f9fa;
+            color: #495057;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .difficulty-btn:hover, .difficulty-btn.active {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+        .emoji {
+            font-size: 24px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎤 منصة تقييم القراءة العربية</h1>
+        <p>نظام ذكي لتقييم القراءة العربية مع التعرف على الكلام وتحليل النطق والتغذية الراجعة الشخصية</p>
+    </div>
+    <!-- إعداد سريع -->
+    <div class="container section">
+        <h3>🚀 الإعداد السريع</h3>
+        <button class="primary-btn" onclick="createTestData()">إنشاء بيانات تجريبية (طالب ونص)</button>
+        <div id="setupResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- إدارة الطلاب -->
+    <div class="container section">
+        <h3>👤 إدارة الطلاب</h3>
+        <div class="form-group">
+            <label>اسم الطالب:</label>
+            <input type="text" id="studentName" placeholder="أدخل اسم الطالب" class="arabic-text">
+        </div>
+        <div class="form-group">
+            <label>البريد الإلكتروني:</label>
+            <input type="email" id="studentEmail" placeholder="أدخل البريد الإلكتروني">
+        </div>
+        <div class="form-group">
+            <label>المستوى الدراسي:</label>
+            <div class="grade-selector">
+                <button type="button" class="grade-btn" onclick="selectGrade(1)">الأول</button>
+                <button type="button" class="grade-btn" onclick="selectGrade(2)">الثاني</button>
+                <button type="button" class="grade-btn" onclick="selectGrade(3)">الثالث</button>
+                <button type="button" class="grade-btn" onclick="selectGrade(4)">الرابع</button>
+                <button type="button" class="grade-btn" onclick="selectGrade(5)">الخامس</button>
+                <button type="button" class="grade-btn" onclick="selectGrade(6)">السادس</button>
+            </div>
+            <input type="hidden" id="studentGrade" value="1">
+        </div>
+        <div class="form-group">
+            <label>مستوى الصعوبة:</label>
+            <div class="difficulty-selector">
+                <button type="button" class="difficulty-btn active" onclick="selectDifficulty('easy')">
+                    <span class="emoji">😊</span>سهل
+                </button>
+                <button type="button" class="difficulty-btn" onclick="selectDifficulty('medium')">
+                    <span class="emoji">🤔</span>متوسط
+                </button>
+                <button type="button" class="difficulty-btn" onclick="selectDifficulty('hard')">
+                    <span class="emoji">💪</span>صعب
+                </button>
+            </div>
+            <input type="hidden" id="studentDifficulty" value="easy">
+        </div>
+        <button onclick="createStudent()">إنشاء طالب جديد</button>
+        <div id="studentResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- إدارة النصوص -->
+    <div class="container section">
+        <h3>📝 إدارة النصوص</h3>
+        <div class="form-group">
+            <label>عنوان النص:</label>
+            <input type="text" id="textTitle" placeholder="أدخل عنوان النص" class="arabic-text">
+        </div>
+        <div class="form-group">
+            <label>المحتوى العربي:</label>
+            <textarea id="textContent" rows="4" class="arabic-text" placeholder="أدخل النص العربي هنا"></textarea>
+        </div>
+        <div class="form-group">
+            <label>المحتوى مع التشكيل:</label>
+            <textarea id="textDiacritics" rows="4" class="arabic-text" placeholder="أَدْخِلِ النَّصَّ العَرَبِيَّ مَعَ التَّشْكِيلِ هُنا"></textarea>
+        </div>
+        <div class="form-group">
+            <label>المستوى الدراسي:</label>
+            <div class="grade-selector">
+                <button type="button" class="grade-btn" onclick="selectTextGrade(1)">الأول</button>
+                <button type="button" class="grade-btn" onclick="selectTextGrade(2)">الثاني</button>
+                <button type="button" class="grade-btn" onclick="selectTextGrade(3)">الثالث</button>
+                <button type="button" class="grade-btn" onclick="selectTextGrade(4)">الرابع</button>
+                <button type="button" class="grade-btn" onclick="selectTextGrade(5)">الخامس</button>
+                <button type="button" class="grade-btn" onclick="selectTextGrade(6)">السادس</button>
+            </div>
+            <input type="hidden" id="textGrade" value="1">
+        </div>
+        <div class="form-group">
+            <label>مستوى الصعوبة:</label>
+            <div class="difficulty-selector">
+                <button type="button" class="difficulty-btn active" onclick="selectTextDifficulty('easy')">
+                    <span class="emoji">😊</span>سهل
+                </button>
+                <button type="button" class="difficulty-btn" onclick="selectTextDifficulty('medium')">
+                    <span class="emoji">🤔</span>متوسط
+                </button>
+                <button type="button" class="difficulty-btn" onclick="selectTextDifficulty('hard')">
+                    <span class="emoji">💪</span>صعب
+                </button>
+            </div>
+            <input type="hidden" id="textDifficultyLevel" value="easy">
+        </div>
+        <div class="form-group">
+            <label>الفئة:</label>
+            <select id="textCategory">
+                <option value="قصص">قصص</option>
+                <option value="دينية">دينية</option>
+                <option value="أدب">أدب</option>
+                <option value="علوم">علوم</option>
+                <option value="تاريخ">تاريخ</option>
+                <option value="عام">عام</option>
+            </select>
+        </div>
+        <button onclick="createText()">إنشاء نص جديد</button>
+        <button onclick="loadTexts()">عرض النصوص المتاحة</button>
+        <div id="textResult" class="result" style="display: none;"></div>
+    </div>
+    <!-- تقييم الصوت -->
+    <div class="container section">
+        <h3>🎙️ تقييم القراءة الصوتية</h3>
+        <div class="form-group">
+            <label>رقم الطالب:</label>
+            <input type="number" id="assessmentStudentId" placeholder="أدخل رقم الطالب">
+        </div>
+        <div class="form-group">
+            <label>رقم النص:</label>
+            <input type="number" id="assessmentTextId" placeholder="أدخل رقم النص">
+        </div>
+        <div class="form-group">
+            <label>ملف الصوت:</label>
+            <input type="file" id="audioFile" accept=".wav,.mp3,.m4a,.ogg,.flac">
+            <small style="color: #666; display: block; margin-top: 5px;">
+                الصيغ المدعومة: WAV, MP3, M4A, OGG, FLAC
+            </small>
+        </div>
+        <button class="primary-btn" onclick="uploadAssessment()">
+            <span class="emoji">🎤</span>رفع الملف الصوتي وبدء التقييم
+        </button>
+        <div id="assessmentResult" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- نتائج التقييم -->
+    <div class="container section">
+        <h3>📊 نتائج التقييم</h3>
+        <div class="form-group">
+            <label>رقم التقييم:</label>
+            <input type="number" id="resultAssessmentId" placeholder="أدخل رقم التقييم">
+        </div>
+        <button onclick="getAssessmentResult()">عرض النتائج التفصيلية</button>
+        <div id="resultDisplay" class="result" style="display: none;"></div>
+        <div id="scoresDisplay" style="display: none;">
+            <div class="score-display">
+                <div class="score-item">
+                    <div class="score-value" id="overallScore">--</div>
+                    <div class="score-label">الدرجة الإجمالية</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value" id="pronunciationScore">--</div>
+                    <div class="score-label">النطق</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value" id="fluencyScore">--</div>
+                    <div class="score-label">الطلاقة</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value" id="accuracyScore">--</div>
+                    <div class="score-label">الدقة</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-value" id="comprehensionScore">--</div>
+                    <div class="score-label">الفهم</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- تقدم الطالب -->
+    <div class="container section">
+        <h3>📈 تقدم الطالب</h3>
+        <div class="form-group">
+            <label>رقم الطالب:</label>
+            <input type="number" id="progressStudentId" placeholder="أدخل رقم الطالب">
+        </div>
+        <div class="form-group">
+            <label>عدد الأيام للتحليل:</label>
+            <input type="number" id="progressDays" value="30" placeholder="30">
+        </div>
+        <button onclick="getStudentProgress()">عرض تقرير التقدم</button>
+        <button onclick="getRecommendations()">الحصول على التوصيات</button>
+        <div id="progressResult" class="result" style="display: none;"></div>
+    </div>
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Grade and difficulty selection functions
+        function selectGrade(grade) {
+            document.getElementById('studentGrade').value = grade;
+            document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function selectDifficulty(difficulty) {
+            document.getElementById('studentDifficulty').value = difficulty;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function selectTextGrade(grade) {
+            document.getElementById('textGrade').value = grade;
+            document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function selectTextDifficulty(difficulty) {
+            document.getElementById('textDifficultyLevel').value = difficulty;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        async function apiCall(endpoint, method = 'GET', data = null, isFormData = false) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {}
+                };
+
+                if (data) {
+                    if (isFormData) {
+                        options.body = data;
+                    } else {
+                        options.headers['Content-Type'] = 'application/json';
+                        options.body = JSON.stringify(data);
+                    }
+                }
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                return { status: response.status, data: result };
+            } catch (error) {
+                return { status: 500, data: { success: false, message: error.message } };
+            }
+        }
+
+        function displayResult(elementId, result, isSuccess = null) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = JSON.stringify(result, null, 2);
+            
+            if (isSuccess !== null) {
+                element.className = `result ${isSuccess ? 'success' : 'error'}`;
+            }
+        }
+
+        async function createTestData() {
+            const result = await apiCall('/demo/quick-test', 'POST');
+            displayResult('setupResult', result.data, result.data.success);
+            
+            if (result.data.success) {
+                document.getElementById('assessmentStudentId').value = result.data.student_id;
+                document.getElementById('assessmentTextId').value = result.data.text_id;
+                document.getElementById('progressStudentId').value = result.data.student_id;
+            }
+        }
+
+        async function createStudent() {
+            const data = {
+                name: document.getElementById('studentName').value,
+                email: document.getElementById('studentEmail').value,
+                grade_level: parseInt(document.getElementById('studentGrade').value),
+                difficulty_level: document.getElementById('studentDifficulty').value
+            };
+
+            if (!data.name || !data.email) {
+                alert('يرجى ملء الاسم والبريد الإلكتروني');
+                return;
+            }
+
+            const result = await apiCall('/students', 'POST', data);
+            displayResult('studentResult', result.data, result.data.success);
+        }
+        async function createText() {
+            const data = {
+                title: document.getElementById('textTitle').value,
+                content: document.getElementById('textContent').value,
+                content_with_diacritics: document.getElementById('textDiacritics').value,
+                grade_level: parseInt(document.getElementById('textGrade').value),
+                difficulty_level: document.getElementById('textDifficultyLevel').value,
+                category: document.getElementById('textCategory').value
+            };
+
+            if (!data.title || !data.content) {
+                alert('يرجى ملء العنوان والمحتوى');
+                return;
+            }
+
+            const result = await apiCall('/texts', 'POST', data);
+            displayResult('textResult', result.data, result.data.success);
+        }
+
+        async function loadTexts() {
+            const result = await apiCall('/texts');
+            displayResult('textResult', result.data, result.data.success);
+        }
+
+        async function uploadAssessment() {
+            const studentId = document.getElementById('assessmentStudentId').value;
+            const textId = document.getElementById('assessmentTextId').value;
+            const audioFile = document.getElementById('audioFile').files[0];
+
+            if (!studentId || !textId || !audioFile) {
+                alert('يرجى ملء جميع الحقول واختيار ملف صوتي');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('student_id', studentId);
+            formData.append('text_id', textId);
+            formData.append('audio', audioFile);
+
+            // Show loading message
+            document.getElementById('assessmentResult').style.display = 'block';
+            document.getElementById('assessmentResult').textContent = 'جاري معالجة الملف الصوتي... يرجى الانتظار';
+            document.getElementById('assessmentResult').className = 'result';
+
+            const result = await apiCall('/assessments', 'POST', formData, true);
+            displayResult('assessmentResult', result.data, result.data.success);
+            
+            if (result.data.success && result.data.assessment_id) {
+                document.getElementById('resultAssessmentId').value = result.data.assessment_id;
+                
+                // Auto-display results if available
+                if (result.data.result) {
+                    displayScores(result.data.result.scores);
+                }
+            }
+        }
+
+        function displayScores(scores) {
+            if (!scores) return;
+            
+            document.getElementById('overallScore').textContent = Math.round(scores.overall || 0);
+            document.getElementById('pronunciationScore').textContent = Math.round(scores.pronunciation || 0);
+            document.getElementById('fluencyScore').textContent = Math.round(scores.fluency || 0);
+            document.getElementById('accuracyScore').textContent = Math.round(scores.accuracy || 0);
+            document.getElementById('comprehensionScore').textContent = Math.round(scores.comprehension || 0);
+            
+            document.getElementById('scoresDisplay').style.display = 'block';
+        }
+
+        async function getAssessmentResult() {
+            const assessmentId = document.getElementById('resultAssessmentId').value;
+            
+            if (!assessmentId) {
+                alert('يرجى إدخال رقم التقييم');
+                return;
+            }
+
+            const result = await apiCall(`/assessments/${assessmentId}`);
+            
+            if (result.data.success && result.data.assessment) {
+                const assessment = result.data.assessment;
+                let display = `نتائج التقييم:\n\n`;
+                display += `الحالة: ${assessment.status}\n`;
+                display += `الطالب: ${assessment.student?.name} (المستوى: ${assessment.student?.grade_level})\n`;
+                display += `النص: ${assessment.text?.title}\n\n`;
+                
+                if (assessment.scores) {
+                    display += `الدرجات:\n`;
+                    display += `الإجمالية: ${Math.round(assessment.scores.overall)}/100\n`;
+                    display += `النطق: ${Math.round(assessment.scores.pronunciation)}/100\n`;
+                    display += `الطلاقة: ${Math.round(assessment.scores.fluency)}/100\n`;
+                    display += `الدقة: ${Math.round(assessment.scores.accuracy)}/100\n`;
+                    display += `الفهم: ${Math.round(assessment.scores.comprehension)}/100\n\n`;
+                    
+                    displayScores(assessment.scores);
+                }
+                
+                if (assessment.transcription) {
+                    display += `النص المنطوق:\n${assessment.transcription.text}\n`;
+                    display += `مستوى الثقة: ${Math.round(assessment.transcription.confidence * 100)}%\n\n`;
+                }
+                
+                if (assessment.feedback) {
+                    display += `التغذية الراجعة:\n${assessment.feedback}\n\n`;
+                }
+                
+                if (assessment.recommendations && assessment.recommendations.length > 0) {
+                    display += `التوصيات:\n`;
+                    assessment.recommendations.forEach((rec, i) => {
+                        display += `${i + 1}. ${rec}\n`;
+                    });
+                }
+                
+                document.getElementById('resultDisplay').textContent = display;
+            } else {
+                displayResult('resultDisplay', result.data, false);
+            }
+            
+            document.getElementById('resultDisplay').style.display = 'block';
+        }
+
+        async function getStudentProgress() {
+            const studentId = document.getElementById('progressStudentId').value;
+            const days = document.getElementById('progressDays').value || 30;
+            
+            if (!studentId) {
+                alert('يرجى إدخال رقم الطالب');
+                return;
+            }
+
+            const result = await apiCall(`/students/${studentId}/progress?days=${days}`);
+            displayResult('progressResult', result.data, result.data.success);
+        }
+
+        async function getRecommendations() {
+            const studentId = document.getElementById('progressStudentId').value;
+            
+            if (!studentId) {
+                alert('يرجى إدخال رقم الطالب');
+                return;
+            }
+
+            const result = await apiCall(`/students/${studentId}/recommendations`);
+            displayResult('progressResult', result.data, result.data.success);
+        }
+
+        // Initialize page
+        window.onload = function() {
+            console.log('منصة تقييم القراءة العربية - واجهة الاختبار محملة');
+            console.log('انقر على "إنشاء بيانات تجريبية" للبدء بسرعة!');
+            
+            // Set default active buttons
+            document.querySelector('.grade-btn').classList.add('active');
+            document.querySelector('.difficulty-btn').classList.add('active');
+        };
+    </script>
+</body>
+</html>
