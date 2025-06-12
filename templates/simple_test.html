@@ -17,14 +17,6 @@
             text-align: right;
         }
         
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 20px;
-        }
-        
         .header {
             text-align: center;
             background: linear-gradient(135deg, #007bff, #28a745);
@@ -38,6 +30,20 @@
             font-size: 36px;
             margin: 0;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
         }
         
         .step {
@@ -139,7 +145,6 @@
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s;
-            font-family: 'Arial Unicode MS', 'Tahoma', sans-serif;
         }
         
         .grade-btn:hover, .difficulty-btn:hover {
@@ -201,13 +206,27 @@
             color: #dc3545;
         }
         
-        .feedback-section {
-            display: none;
-            margin-top: 30px;
-            padding: 25px;
-            background: #e8f5e8;
+        .processing {
+            text-align: center;
+            padding: 30px;
+            background: #fff3cd;
             border-radius: 10px;
-            border: 2px solid #28a745;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         .assessment-card {
@@ -348,77 +367,6 @@
             border-color: rgba(255,255,255,0.5);
             transform: translateY(-2px);
         }
-        
-        .scores {
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            margin: 20px 0;
-        }
-        
-        .score-item {
-            text-align: center;
-            padding: 15px;
-            background: white;
-            border-radius: 10px;
-            margin: 5px;
-            min-width: 120px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .score-value {
-            font-size: 32px;
-            font-weight: bold;
-            color: #007bff;
-        }
-        
-        .score-label {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
-        }
-        
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: bold;
-            z-index: 1000;
-            max-width: 300px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-        }
-        
-        .notification.success { background: #28a745; }
-        .notification.error { background: #dc3545; }
-        .notification.info { background: #007bff; }
-        
-        .hidden { display: none; }
-        
-        .processing {
-            text-align: center;
-            padding: 30px;
-            background: #fff3cd;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
-        
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #007bff;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
@@ -429,7 +377,7 @@
 
     <!-- Step 1: Student Registration -->
     <div class="container step active" id="step1">
-        <h3>📝 الخطوة الأولى: معلومات الطالب</h3>
+        <h3>📝 معلومات الطالب</h3>
         
         <div class="form-group">
             <label>اسم الطالب:</label>
@@ -444,12 +392,12 @@
         <div class="form-group">
             <label>المستوى الدراسي:</label>
             <div class="grade-selector">
-                <button type="button" class="grade-btn active" onclick="selectGrade(1)">الأول</button>
-                <button type="button" class="grade-btn" onclick="selectGrade(2)">الثاني</button>
-                <button type="button" class="grade-btn" onclick="selectGrade(3)">الثالث</button>
-                <button type="button" class="grade-btn" onclick="selectGrade(4)">الرابع</button>
-                <button type="button" class="grade-btn" onclick="selectGrade(5)">الخامس</button>
-                <button type="button" class="grade-btn" onclick="selectGrade(6)">السادس</button>
+                <button type="button" class="grade-btn active" id="grade1">الأول</button>
+                <button type="button" class="grade-btn" id="grade2">الثاني</button>
+                <button type="button" class="grade-btn" id="grade3">الثالث</button>
+                <button type="button" class="grade-btn" id="grade4">الرابع</button>
+                <button type="button" class="grade-btn" id="grade5">الخامس</button>
+                <button type="button" class="grade-btn" id="grade6">السادس</button>
             </div>
             <input type="hidden" id="selectedGrade" value="1">
         </div>
@@ -457,15 +405,9 @@
         <div class="form-group">
             <label>مستوى الصعوبة:</label>
             <div class="difficulty-selector">
-                <button type="button" class="difficulty-btn active" onclick="selectDifficulty('easy')">
-                    😊 سهل
-                </button>
-                <button type="button" class="difficulty-btn" onclick="selectDifficulty('medium')">
-                    🤔 متوسط
-                </button>
-                <button type="button" class="difficulty-btn" onclick="selectDifficulty('hard')">
-                    💪 صعب
-                </button>
+                <button type="button" class="difficulty-btn active" id="diffEasy">😊 سهل</button>
+                <button type="button" class="difficulty-btn" id="diffMedium">🤔 متوسط</button>
+                <button type="button" class="difficulty-btn" id="diffHard">💪 صعب</button>
             </div>
             <input type="hidden" id="selectedDifficulty" value="easy">
         </div>
@@ -473,9 +415,12 @@
         <button onclick="registerStudent()">التسجيل والمتابعة</button>
     </div>
 
-    <!-- Step 2: Listen and Record -->
+    <!-- Step 2: Listening and Recording Page -->
     <div class="container step hidden" id="step2">
-        <h3>🎧 استمع واقرأ النص</h3>
+        <h3>🎧 صفحة الاستماع والتسجيل</h3>
+        <p style="text-align: center; color: #666; margin-bottom: 20px;">
+            استمع للنص أولاً، ثم اقرأه بصوت واضح
+        </p>
         
         <div id="generatedText" class="arabic-text">
             جاري توليد النص...
@@ -508,11 +453,11 @@
             <p>جاري تحليل قراءتك وإنشاء التقييم...</p>
         </div>
         
-        <!-- Assessment Results Card - Shows below after processing -->
+        <!-- Assessment Results Card -->
         <div class="assessment-card hidden" id="assessmentCard">
             <h4>📊 نتائج التقييم</h4>
             
-            <!-- Scores Grid with icons in same row -->
+            <!-- Scores Grid -->
             <div class="scores-grid" id="scoresDisplay">
                 <div class="score-item">
                     <div class="score-header">
@@ -559,127 +504,297 @@
             </div>
         </div>
     </div>
-    <!-- Hidden inputs for session data -->
+
+    <!-- Hidden inputs -->
     <input type="hidden" id="currentStudentId">
     <input type="hidden" id="currentTextId">
-    <input type="hidden" id="currentTextContent">
 
-    <script src="/static/js/realtime-recorder.js"></script>
     <script>
-        let currentStep = 1;
+        let selectedGrade = 1;
+        let selectedDifficulty = 'easy';
         let studentData = null;
         let currentText = null;
+        let socket = null;
+        let mediaRecorder = null;
+        let audioStream = null;
+        let isRecording = false;
+        let recordingTimer = null;
 
-        // Step navigation functions
-        function showStep(stepNumber) {
-            // Hide all steps
-            for (let i = 1; i <= 3; i++) {
-                const step = document.getElementById(`step${i}`);
-                step.classList.add('hidden');
-                step.classList.remove('active');
-            }
+        // Initialize WebSocket connection
+        function initializeSocket() {
+            socket = io();
             
-            // Show current step
-            const currentStepElement = document.getElementById(`step${stepNumber}`);
-            currentStepElement.classList.remove('hidden');
-            currentStepElement.classList.add('active');
+            socket.on('connected', (data) => {
+                console.log('Connected to server:', data.message);
+            });
             
-            currentStep = stepNumber;
+            socket.on('recording_started', (data) => {
+                console.log('Recording started:', data);
+                updateRecordingUI(true);
+            });
+            
+            socket.on('chunk_processed', (data) => {
+                console.log('Chunk processed:', data.chunk_count);
+            });
+            
+            socket.on('processing_started', (data) => {
+                showProcessingUI();
+            });
+            
+            socket.on('assessment_complete', (data) => {
+                console.log('Assessment complete:', data);
+                onAssessmentComplete(data.result);
+            });
+            
+            socket.on('recording_error', (data) => {
+                alert(data.message);
+                resetRecordingUI();
+            });
+            
+            socket.on('assessment_error', (data) => {
+                alert(data.message);
+                resetRecordingUI();
+            });
         }
 
-        // Simple grade selection
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSocket();
+        });
+
+        // Initialize grade buttons
+        document.getElementById('grade1').onclick = () => selectGrade(1);
+        document.getElementById('grade2').onclick = () => selectGrade(2);
+        document.getElementById('grade3').onclick = () => selectGrade(3);
+        document.getElementById('grade4').onclick = () => selectGrade(4);
+        document.getElementById('grade5').onclick = () => selectGrade(5);
+        document.getElementById('grade6').onclick = () => selectGrade(6);
+
+        // Initialize difficulty buttons
+        document.getElementById('diffEasy').onclick = () => selectDifficulty('easy');
+        document.getElementById('diffMedium').onclick = () => selectDifficulty('medium');
+        document.getElementById('diffHard').onclick = () => selectDifficulty('hard');
+
         function selectGrade(grade) {
+            console.log('Selecting grade:', grade);
+            selectedGrade = grade;
             document.getElementById('selectedGrade').value = grade;
             
+            // Remove active from all
             document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // Add active to selected
+            document.getElementById('grade' + grade).classList.add('active');
         }
 
-        // Simple difficulty selection  
         function selectDifficulty(difficulty) {
+            console.log('Selecting difficulty:', difficulty);
+            selectedDifficulty = difficulty;
             document.getElementById('selectedDifficulty').value = difficulty;
             
+            // Remove active from all
             document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // Add active to selected
+            const diffMap = { 'easy': 'diffEasy', 'medium': 'diffMedium', 'hard': 'diffHard' };
+            document.getElementById(diffMap[difficulty]).classList.add('active');
         }
 
-        // Simple registration
         async function registerStudent() {
             const name = document.getElementById('studentName').value.trim();
             const email = document.getElementById('studentEmail').value.trim();
-            const grade = parseInt(document.getElementById('selectedGrade').value);
-            const difficulty = document.getElementById('selectedDifficulty').value;
 
             if (!name || !email) {
                 alert('يرجى ملء جميع الحقول المطلوبة');
                 return;
             }
 
+            console.log('Registering:', { name, email, grade: selectedGrade, difficulty: selectedDifficulty });
+
             try {
                 const response = await fetch('/api/students', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, grade_level: grade, difficulty_level: difficulty })
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        grade_level: selectedGrade,
+                        difficulty_level: selectedDifficulty
+                    })
                 });
 
                 const result = await response.json();
+                console.log('Registration result:', result);
 
                 if (result.success) {
                     studentData = result.student;
                     document.getElementById('currentStudentId').value = studentData.id;
                     
+                    // Show success message
+                    alert(`مرحباً ${studentData.name}! تم التسجيل بنجاح`);
+                    
+                    // Generate text for the new page
                     await generateTextForStudent();
+                    
+                    // Transition to listening page (step 2)
                     showStep(2);
                 } else {
                     alert(result.message || 'خطأ في التسجيل');
                 }
             } catch (error) {
+                console.error('Registration error:', error);
                 alert('خطأ في الاتصال بالخادم');
             }
         }
 
-        // Step 2: Generate and display text
         async function generateTextForStudent() {
             try {
                 const response = await fetch('/api/generate-text', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        grade_level: studentData.grade_level,
-                        difficulty_level: studentData.difficulty_level,
+                        grade_level: selectedGrade,
+                        difficulty_level: selectedDifficulty,
                         topic: 'تعليمي'
                     })
                 });
 
                 const result = await response.json();
+                console.log('Text generation result:', result);
 
                 if (result.success) {
                     currentText = result.text;
                     document.getElementById('currentTextId').value = currentText.id;
-                    document.getElementById('currentTextContent').value = currentText.content;
-                    
                     document.getElementById('generatedText').textContent = currentText.content;
                 } else {
-                    showNotification('خطأ في توليد النص', 'error');
+                    document.getElementById('generatedText').textContent = 'خطأ في توليد النص';
                 }
             } catch (error) {
                 console.error('Text generation error:', error);
-                showNotification('خطأ في توليد النص', 'error');
+                document.getElementById('generatedText').textContent = 'خطأ في توليد النص';
             }
         }
 
-        // Step 2: Play text audio
+        function showStep(stepNumber) {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.add('hidden');
+                step.classList.remove('active');
+            });
+            
+            // Show target step
+            const targetStep = document.getElementById('step' + stepNumber);
+            if (targetStep) {
+                targetStep.classList.remove('hidden');
+                targetStep.classList.add('active');
+                
+                // Scroll to top of new page
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Real recording functions
+        async function startRecording() {
+            if (!studentData || !currentText) {
+                alert('يرجى التأكد من التسجيل وتوليد النص أولاً');
+                return;
+            }
+
+            try {
+                // Request microphone access
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 16000
+                    }
+                });
+
+                // Create MediaRecorder
+                mediaRecorder = new MediaRecorder(audioStream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                // Handle audio data
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0 && isRecording) {
+                        sendAudioChunk(event.data);
+                    }
+                };
+
+                // Start recording
+                mediaRecorder.start(500); // Send chunks every 500ms
+                isRecording = true;
+
+                // Start recording session on server
+                socket.emit('start_recording', {
+                    student_id: parseInt(studentData.id),
+                    text_id: parseInt(currentText.id)
+                });
+
+                // Start UI timer
+                startRecordingTimer();
+
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                alert('خطأ في الوصول للميكروفون');
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+
+            try {
+                // Stop MediaRecorder
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // Stop audio stream
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
+                }
+
+                // Stop timer
+                stopRecordingTimer();
+
+                // Notify server
+                socket.emit('stop_recording');
+
+                // Update UI
+                updateRecordingUI(false);
+
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+                alert('خطأ في إيقاف التسجيل');
+            }
+        }
+
+        async function sendAudioChunk(audioBlob) {
+            try {
+                // Convert blob to base64
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+                // Send to server
+                socket.emit('audio_chunk', {
+                    audio: base64Audio
+                });
+
+            } catch (error) {
+                console.error('Error sending audio chunk:', error);
+            }
+        }
+
+        // Text-to-speech function
         async function playText() {
-            if (!currentText) return;
+            if (!currentText) {
+                alert('لا يوجد نص للتشغيل');
+                return;
+            }
 
             try {
                 const response = await fetch('/api/text-to-speech', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         text: currentText.content_with_diacritics || currentText.content
                     })
@@ -701,340 +816,252 @@
                         URL.revokeObjectURL(audioUrl);
                     };
                 } else {
-                    showNotification('خطأ في تشغيل الصوت', 'error');
+                    alert('خطأ في تشغيل الصوت');
                 }
             } catch (error) {
                 console.error('TTS error:', error);
-                showNotification('خطأ في تشغيل الصوت', 'error');
+                alert('خطأ في تشغيل الصوت');
             }
         }
 
-        // Generate new text
-        async function generateNewText() {
-            document.getElementById('generatedText').textContent = 'جاري توليد نص جديد...';
-            await generateTextForStudent();
-        }
-
-        // Recording functions
-        function startRecording() {
-            if (realtimeRecorder) {
-                realtimeRecorder.startRecording();
+        // UI Functions
+        function updateRecordingUI(recording) {
+            const recordBtn = document.getElementById('recordButton');
+            const stopBtn = document.getElementById('stopButton');
+            const indicator = document.getElementById('recordingIndicator');
+            
+            if (recording) {
+                recordBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                indicator.style.display = 'block';
+            } else {
+                recordBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                indicator.style.display = 'none';
             }
         }
 
-        function stopRecording() {
-            if (realtimeRecorder) {
-                realtimeRecorder.stopRecording();
-            }
+        function resetRecordingUI() {
+            updateRecordingUI(false);
+            document.getElementById('processingIndicator').classList.add('hidden');
         }
 
-        // Start over
+        function showProcessingUI() {
+            document.getElementById('processingIndicator').classList.remove('hidden');
+        }
+
+        function startRecordingTimer() {
+            let seconds = 0;
+            recordingTimer = setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                const timeString = `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+                document.getElementById('recordingTimer').textContent = timeString;
+            }, 1000);
+        }
+
+        function stopRecordingTimer() {
+            if (recordingTimer) {
+                clearInterval(recordingTimer);
+                recordingTimer = null;
+            }
+        }
+        // Assessment results functions
+        function onAssessmentComplete(result) {
+            console.log('Assessment complete:', result);
+            
+            // Hide processing indicator
+            document.getElementById('processingIndicator').classList.add('hidden');
+            
+            // Show the assessment card immediately below the text section
+            const assessmentCard = document.getElementById('assessmentCard');
+            assessmentCard.classList.remove('hidden');
+            
+            // Display scores with animation
+            if (result && result.scores) {
+                // Show individual scores first
+                setTimeout(() => {
+                    document.getElementById('pronunciationScore').textContent = Math.round(result.scores.pronunciation || 0);
+                    animateScore('pronunciationScore');
+                }, 200);
+                
+                setTimeout(() => {
+                    document.getElementById('fluencyScore').textContent = Math.round(result.scores.fluency || 0);
+                    animateScore('fluencyScore');
+                }, 400);
+                
+                setTimeout(() => {
+                    document.getElementById('accuracyScore').textContent = Math.round(result.scores.accuracy || 0);
+                    animateScore('accuracyScore');
+                }, 600);
+                
+                // Show overall score last
+                setTimeout(() => {
+                    document.getElementById('overallScore').textContent = Math.round(result.scores.overall || 0);
+                    animateScore('overallScore');
+                }, 800);
+            }
+            
+            // Generate personalized feedback
+            setTimeout(() => {
+                generatePersonalizedFeedback(result);
+            }, 1000);
+            
+            // Smooth scroll to results (but keep them on same page)
+            setTimeout(() => {
+                assessmentCard.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start',
+                    inline: 'nearest'
+                });
+            }, 1200);
+        }
+        
+        function animateScore(elementId) {
+            const element = document.getElementById(elementId);
+            element.style.transform = 'scale(1.3)';
+            element.style.transition = 'transform 0.4s ease';
+            
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 400);
+        }
+
+        function generatePersonalizedFeedback(result) {
+            const scores = result ? result.scores || {} : {};
+            const studentName = studentData ? studentData.name : 'الطالب';
+            
+            let feedback = `مرحباً ${studentName}! `;
+            
+            // Overall performance assessment
+            const overallScore = scores.overall || 0;
+            if (overallScore >= 90) {
+                feedback += "أداء ممتاز! 🌟 ";
+            } else if (overallScore >= 80) {
+                feedback += "أداء جيد جداً! 👏 ";
+            } else if (overallScore >= 70) {
+                feedback += "أداء جيد! 👍 ";
+            } else if (overallScore >= 60) {
+                feedback += "أداء مقبول، يمكنك التحسن! 💪 ";
+            } else {
+                feedback += "تحتاج إلى مزيد من التدريب! 📚 ";
+            }
+            
+            // Specific feedback based on scores
+            const pronunciationScore = scores.pronunciation || 0;
+            const fluencyScore = scores.fluency || 0;
+            const accuracyScore = scores.accuracy || 0;
+            
+            // Find strongest and weakest areas
+            const scoreAreas = [
+                { name: 'النطق', score: pronunciationScore, icon: '🗣️' },
+                { name: 'الطلاقة', score: fluencyScore, icon: '⚡' },
+                { name: 'الدقة', score: accuracyScore, icon: '🎯' }
+            ];
+            
+            scoreAreas.sort((a, b) => b.score - a.score);
+            const strongest = scoreAreas[0];
+            const weakest = scoreAreas[2];
+            
+            feedback += `\n\n${strongest.icon} نقطة قوتك: ${strongest.name} (${Math.round(strongest.score)}/100)`;
+            
+            if (weakest.score < 70) {
+                feedback += `\n🎯 يمكن تحسين: ${weakest.name} (${Math.round(weakest.score)}/100)`;
+            }
+            
+            // Recommendations
+            feedback += "\n\n📋 توصيات للتحسن:\n";
+            
+            if (pronunciationScore < 70) {
+                feedback += "• استمع للنص عدة مرات قبل القراءة\n";
+                feedback += "• ركز على نطق الحروف بوضوح\n";
+            }
+            
+            if (fluencyScore < 70) {
+                feedback += "• اقرأ بسرعة مناسبة، لا تتسرع\n";
+                feedback += "• تدرب على القراءة يومياً\n";
+            }
+            
+            if (accuracyScore < 70) {
+                feedback += "• انتبه للكلمات وتجنب الأخطاء\n";
+                feedback += "• راجع النص قبل البدء بالقراءة\n";
+            }
+            
+            // Motivational message
+            const motivationalMessages = [
+                "القراءة مفتاح العلم والمعرفة! 📖",
+                "كل قراءة تجعلك أقوى! 💪",
+                "أنت على الطريق الصحيح! 🌟",
+                "التدريب يؤدي إلى الإتقان! 🎯",
+                "أحسنت، واصل التقدم! 👏"
+            ];
+            
+            const randomMessage = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
+            feedback += `\n\n${randomMessage}`;
+            
+            // Display with typing effect
+            displayFeedbackWithTypingEffect(feedback);
+        }
+
+        function displayFeedbackWithTypingEffect(text) {
+            const feedbackElement = document.getElementById('personalizedFeedback');
+            feedbackElement.textContent = '';
+            
+            let index = 0;
+            const typingSpeed = 30;
+            
+            function typeCharacter() {
+                if (index < text.length) {
+                    feedbackElement.textContent += text.charAt(index);
+                    index++;
+                    setTimeout(typeCharacter, typingSpeed);
+                }
+            }
+            
+            typeCharacter();
+        }
+
         function startOver() {
             // Reset all data
             studentData = null;
             currentText = null;
             document.getElementById('currentStudentId').value = '';
             document.getElementById('currentTextId').value = '';
-            document.getElementById('currentTextContent').value = '';
             
             // Reset form
             document.getElementById('studentName').value = '';
             document.getElementById('studentEmail').value = '';
             
-            // Reset steps
-            document.querySelectorAll('.step').forEach(step => {
-                step.classList.remove('completed');
-            });
+            // Reset grade and difficulty to defaults
+            selectedGrade = 1;
+            selectedDifficulty = 'easy';
+            document.getElementById('selectedGrade').value = '1';
+            document.getElementById('selectedDifficulty').value = 'easy';
             
+            // Reset button states
+            document.querySelectorAll('.grade-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('grade1').classList.add('active');
+            
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('diffEasy').classList.add('active');
+            
+            // Hide assessment card
+            document.getElementById('assessmentCard').classList.add('hidden');
+            
+            // Reset recording UI
+            resetRecordingUI();
+            
+            // Go back to registration page
             showStep(1);
         }
 
-        // Notification system
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
+        function generateNewText() {
+            // Hide previous results
+            document.getElementById('assessmentCard').classList.add('hidden');
             
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 5000);
-        }
-
-        // Override recorder callbacks
-        window.onRecordingStarted = function() {
-            document.getElementById('recordButton').classList.add('hidden');
-            document.getElementById('stopButton').classList.remove('hidden');
-            document.getElementById('recordingIndicator').style.display = 'block';
-        };
-
-        window.onRecordingStopped = function() {
-            document.getElementById('recordButton').classList.remove('hidden');
-            document.getElementById('stopButton').classList.add('hidden');
-            document.getElementById('recordingIndicator').style.display = 'none';
-            document.getElementById('processingIndicator').classList.remove('hidden');
-        };
-
-        window.onAssessmentComplete = function(result) {
-            console.log('🎯 Assessment complete callback triggered:', result);
-            
-            document.getElementById('processingIndicator').classList.add('hidden');
-            
-            // Show the assessment card below the existing content
-            const assessmentCard = document.getElementById('assessmentCard');
-            assessmentCard.classList.remove('hidden');
-            
-            // Display scores immediately
-            if (result && result.scores) {
-                console.log('📊 Displaying scores:', result.scores);
-                
-                // Display individual scores first
-                document.getElementById('pronunciationScore').textContent = Math.round(result.scores.pronunciation || 0);
-                document.getElementById('fluencyScore').textContent = Math.round(result.scores.fluency || 0);
-                document.getElementById('accuracyScore').textContent = Math.round(result.scores.accuracy || 0);
-                
-                // Display overall score last with animation
-                setTimeout(() => {
-                    document.getElementById('overallScore').textContent = Math.round(result.scores.overall || 0);
-                    animateScore('overallScore');
-                }, 500);
-                
-                // Animate individual scores
-                setTimeout(() => animateScore('pronunciationScore'), 100);
-                setTimeout(() => animateScore('fluencyScore'), 200);
-                setTimeout(() => animateScore('accuracyScore'), 300);
-            } else {
-                console.error('❌ No scores found in result:', result);
-            }
-            
-            // Generate and display personalized feedback
-            generatePersonalizedFeedback(result);
-            
-            // Scroll to results
-            setTimeout(() => {
-                assessmentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 600);
-        };
-        
-        function animateScore(elementId) {
-            const element = document.getElementById(elementId);
-            element.style.transform = 'scale(1.2)';
-            element.style.transition = 'transform 0.3s ease';
-            
-            setTimeout(() => {
-                element.style.transform = 'scale(1)';
-            }, 300);
-        }
-        
-        function generatePersonalizedFeedback(result) {
-            console.log('💬 Generating personalized feedback for:', result);
-            
-            const scores = result ? result.scores || {} : {};
-            const errors = result ? result.errors || [] : [];
-            const studentName = studentData ? studentData.name : 'الطالب';
-            
-            console.log('📊 Scores for feedback:', scores);
-            console.log('❌ Errors for feedback:', errors);
-            
-            let feedback = `مرحباً ${studentName}! `;
-            
-            // Overall performance assessment
-            const overallScore = scores.overall || 0;
-            if (overallScore >= 90) {
-                feedback += "أداء ممتاز! 🌟 ";
-            } else if (overallScore >= 80) {
-                feedback += "أداء جيد جداً! 👏 ";
-            } else if (overallScore >= 70) {
-                feedback += "أداء جيد! 👍 ";
-            } else if (overallScore >= 60) {
-                feedback += "أداء مقبول، يمكنك التحسن! 💪 ";
-            } else {
-                feedback += "تحتاج إلى مزيد من التدريب! 📚 ";
-            }
-            
-            // Specific feedback based on scores
-            const pronunciationScore = scores.pronunciation || 0;
-            const fluencyScore = scores.fluency || 0;
-            const accuracyScore = scores.accuracy || 0;
-            
-            // Find strongest and weakest areas
-            const scoreAreas = [
-                { name: 'النطق', score: pronunciationScore, icon: '🗣️' },
-                { name: 'الطلاقة', score: fluencyScore, icon: '⚡' },
-                { name: 'الدقة', score: accuracyScore, icon: '🎯' }
-            ];
-            
-            scoreAreas.sort((a, b) => b.score - a.score);
-            const strongest = scoreAreas[0];
-            const weakest = scoreAreas[2];
-            
-            feedback += `\n\n${strongest.icon} نقطة قوتك: ${strongest.name} (${Math.round(strongest.score)}/100)`;
-            
-            if (weakest.score < 70) {
-                feedback += `\n🎯 يمكن تحسين: ${weakest.name} (${Math.round(weakest.score)}/100)`;
-            }
-            
-            // Specific recommendations based on performance
-            feedback += "\n\n📋 توصيات للتحسن:\n";
-            
-            if (pronunciationScore < 70) {
-                feedback += "• استمع للنص عدة مرات قبل القراءة\n";
-                feedback += "• ركز على نطق الحروف بوضوح\n";
-            }
-            
-            if (fluencyScore < 70) {
-                feedback += "• اقرأ بسرعة مناسبة، لا تتسرع\n";
-                feedback += "• تدرب على القراءة يومياً\n";
-            }
-            
-            if (accuracyScore < 70) {
-                feedback += "• انتبه للكلمات وتجنب الأخطاء\n";
-                feedback += "• راجع النص قبل البدء بالقراءة\n";
-            }
-            
-            // Encouragement based on grade level
-            if (studentData && studentData.grade_level <= 2) {
-                feedback += "\n🌟 أنت في بداية رحلة تعلم القراءة، استمر في التدريب!";
-            } else if (studentData && studentData.grade_level <= 4) {
-                feedback += "\n📚 أنت تتقدم بشكل رائع في القراءة، واصل الجهد!";
-            } else {
-                feedback += "\n🎓 مستواك متقدم، حافظ على هذا الأداء الجيد!";
-            }
-            
-            // Add motivational message
-            const motivationalMessages = [
-                "القراءة مفتاح العلم والمعرفة! 📖",
-                "كل قراءة تجعلك أقوى! 💪",
-                "أنت على الطريق الصحيح! 🌟",
-                "التدريب يؤدي إلى الإتقان! 🎯",
-                "أحسنت، واصل التقدم! 👏"
-            ];
-            
-            const randomMessage = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
-            feedback += `\n\n${randomMessage}`;
-            
-            // Display the personalized feedback with typing effect
-            displayFeedbackWithTypingEffect(feedback);
-        }
-        
-        function displayFeedbackWithTypingEffect(text) {
-            const feedbackElement = document.getElementById('personalizedFeedback');
-            feedbackElement.textContent = '';
-            
-            let index = 0;
-            const typingSpeed = 30; // milliseconds per character
-            
-            function typeCharacter() {
-                if (index < text.length) {
-                    feedbackElement.textContent += text.charAt(index);
-                    index++;
-                    setTimeout(typeCharacter, typingSpeed);
-                }
-            }
-            
-            typeCharacter();
-        }
-            
-            let feedback = `مرحباً ${studentName}! `;
-            
-            // Overall performance assessment
-            const overallScore = scores.overall || 0;
-            if (overallScore >= 90) {
-                feedback += "أداء ممتاز! 🌟 ";
-            } else if (overallScore >= 80) {
-                feedback += "أداء جيد جداً! 👏 ";
-            } else if (overallScore >= 70) {
-                feedback += "أداء جيد! 👍 ";
-            } else if (overallScore >= 60) {
-                feedback += "أداء مقبول، يمكنك التحسن! 💪 ";
-            } else {
-                feedback += "تحتاج إلى مزيد من التدريب! 📚 ";
-            }
-            
-            // Specific feedback based on scores
-            const pronunciationScore = scores.pronunciation || 0;
-            const fluencyScore = scores.fluency || 0;
-            const accuracyScore = scores.accuracy || 0;
-            
-            // Find strongest and weakest areas
-            const scoreAreas = [
-                { name: 'النطق', score: pronunciationScore, icon: '🗣️' },
-                { name: 'الطلاقة', score: fluencyScore, icon: '⚡' },
-                { name: 'الدقة', score: accuracyScore, icon: '🎯' }
-            ];
-            
-            scoreAreas.sort((a, b) => b.score - a.score);
-            const strongest = scoreAreas[0];
-            const weakest = scoreAreas[2];
-            
-            feedback += `\n\n${strongest.icon} نقطة قوتك: ${strongest.name} (${Math.round(strongest.score)}/100)`;
-            
-            if (weakest.score < 70) {
-                feedback += `\n🎯 يمكن تحسين: ${weakest.name} (${Math.round(weakest.score)}/100)`;
-            }
-            
-            // Specific recommendations based on performance
-            feedback += "\n\n📋 توصيات للتحسن:\n";
-            
-            if (pronunciationScore < 70) {
-                feedback += "• استمع للنص عدة مرات قبل القراءة\n";
-                feedback += "• ركز على نطق الحروف بوضوح\n";
-            }
-            
-            if (fluencyScore < 70) {
-                feedback += "• اقرأ بسرعة مناسبة، لا تتسرع\n";
-                feedback += "• تدرب على القراءة يومياً\n";
-            }
-            
-            if (accuracyScore < 70) {
-                feedback += "• انتبه للكلمات وتجنب الأخطاء\n";
-                feedback += "• راجع النص قبل البدء بالقراءة\n";
-            }
-            
-            // Encouragement based on grade level
-            if (studentData && studentData.grade_level <= 2) {
-                feedback += "\n🌟 أنت في بداية رحلة تعلم القراءة، استمر في التدريب!";
-            } else if (studentData && studentData.grade_level <= 4) {
-                feedback += "\n📚 أنت تتقدم بشكل رائع في القراءة، واصل الجهد!";
-            } else {
-                feedback += "\n🎓 مستواك متقدم، حافظ على هذا الأداء الجيد!";
-            }
-            
-            // Add motivational message
-            const motivationalMessages = [
-                "القراءة مفتاح العلم والمعرفة! 📖",
-                "كل قراءة تجعلك أقوى! 💪",
-                "أنت على الطريق الصحيح! 🌟",
-                "التدريب يؤدي إلى الإتقان! 🎯",
-                "أحسنت، واصل التقدم! 👏"
-            ];
-            
-            const randomMessage = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
-            feedback += `\n\n${randomMessage}`;
-            
-            // Display the personalized feedback with typing effect
-            displayFeedbackWithTypingEffect(feedback);
-        }
-        
-        function displayFeedbackWithTypingEffect(text) {
-            const feedbackElement = document.getElementById('personalizedFeedback');
-            feedbackElement.textContent = '';
-            
-            let index = 0;
-            const typingSpeed = 30; // milliseconds per character
-            
-            function typeCharacter() {
-                if (index < text.length) {
-                    feedbackElement.textContent += text.charAt(index);
-                    index++;
-                    setTimeout(typeCharacter, typingSpeed);
-                }
-            }
-            
-            typeCharacter();
+            // Generate new text
+            generateTextForStudent();
         }
     </script>
 </body>

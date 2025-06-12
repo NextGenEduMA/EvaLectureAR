@@ -69,6 +69,11 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     """Serve the simplified Arabic interface"""
+    return render_template('simple_test.html')
+
+@app.route('/original')
+def original_interface():
+    """Serve the original complex interface"""
     return render_template('simple_arabic.html')
 
 @app.route('/test')
