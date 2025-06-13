@@ -1,5 +1,6 @@
 import os
 import logging
+import warnings
 from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -11,12 +12,22 @@ import json
 import base64
 import io
 
+# Suppress common warnings that don't affect functionality
+warnings.filterwarnings("ignore", message="Passing `gradient_checkpointing` to a config initialization is deprecated")
+warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
+warnings.filterwarnings("ignore", category=UserWarning, module="multiprocessing.resource_tracker")
+
+# Handle multiprocessing properly for web apps
+import multiprocessing
+multiprocessing.set_start_method('spawn', force=True)
+
 # Import our services
 from models.database import db, Student, Assessment, Text, PronunciationError, AudioFeedback
 from services.speech_recognition import ArabicSpeechRecognizer
 from services.ai_assessment import ArabicAssessmentEngine
 from services.feedback_generation import ArabicFeedbackGenerator
 from services.learning_management import LearningManagementSystem
+from rag.rag_pipeline import RAGPipeline
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -42,17 +53,37 @@ migrate = Migrate(app, db)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+from rag.rag_pipeline import RAGPipeline
+
 # Initialize services
 speech_recognizer = ArabicSpeechRecognizer()
 assessment_engine = ArabicAssessmentEngine()
 feedback_generator = ArabicFeedbackGenerator()
 learning_system = LearningManagementSystem()
 
-# Initialize real-time processor
-from services.realtime_processor import RealTimeAudioProcessor
-realtime_processor = RealTimeAudioProcessor(
-    speech_recognizer, assessment_engine, feedback_generator, learning_system
-)
+# Initialize RAG system - with proper error handling
+try:
+    # Initialize RAG with timeout handling
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+    def init_rag():
+        rag = RAGPipeline()
+        return rag
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(init_rag)
+        try:
+            rag_system = future.result(timeout=10)  # 10 second timeout for initialization
+            logger.info("RAG system initialized successfully")
+        except (TimeoutError, FutureTimeoutError):
+            logger.warning("RAG system initialization timed out, will initialize on demand")
+            rag_system = None
+        except Exception as e:
+            logger.warning(f"RAG system initialization failed: {e}, will initialize on demand")
+            rag_system = None
+except Exception as e:
+    logger.warning(f"Error setting up RAG system: {e}")
+    rag_system = None
 
 # Create upload directories
 UPLOAD_FOLDER = 'uploads'
@@ -253,18 +284,19 @@ def get_texts():
 
 @app.route('/api/texts/random', methods=['GET'])
 def get_random_text():
-    """Get a random text based on student's grade level and difficulty"""
+    """Get a random text based on student's grade level and difficulty - Enhanced with RAG"""
     try:
         grade_level = request.args.get('grade_level', 1, type=int)
         difficulty_level = request.args.get('difficulty_level', 'easy')
+        force_rag = request.args.get('force_rag', 'false').lower() == 'true'  # Default to database first
 
-        # Try to find a matching text from database
+        # Try database first (default behavior)
         text = Text.query.filter_by(
             grade_level=grade_level,
             difficulty_level=difficulty_level
         ).first()
 
-        if text:
+        if text and not force_rag:
             return jsonify({
                 'success': True,
                 'text': {
@@ -274,9 +306,117 @@ def get_random_text():
                     'content_with_diacritics': text.content_with_diacritics,
                     'difficulty_level': text.difficulty_level,
                     'category': text.category
-                }
+                },
+                'rag_generated': False
             })
-        else:
+
+        # Use RAG to generate new content (only if explicitly requested)
+        try:
+            # Use threading-based timeout instead of signal-based timeout
+            import threading
+            import time
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+            def rag_generation_task():
+                from rag import RAGPipeline
+                from dotenv import load_dotenv
+                load_dotenv()  # Ensure environment variables are loaded
+
+                # Initialize RAG system
+                rag = RAGPipeline()
+                rag.initialize_system()
+                return rag
+
+            # Use ThreadPoolExecutor with timeout
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(rag_generation_task)
+                try:
+                    rag = future.result(timeout=30)  # 30 second timeout
+                except FutureTimeoutError:
+                    raise TimeoutError("RAG initialization timed out")
+
+                # Create appropriate prompts based on grade level and difficulty
+                difficulty_instructions = {
+                    'easy': 'استخدم كلمات بسيطة وجمل قصيرة',
+                    'medium': 'استخدم كلمات متوسطة وجمل معتدلة الطول',
+                    'hard': 'استخدم مفردات متقدمة وجمل معقدة'
+                }
+
+                # Grade-specific topics
+                grade_topics = {
+                    1: ['الأسرة', 'البيت', 'الألوان', 'الحيوانات', 'الطعام'],
+                    2: ['المدرسة', 'الأصدقاء', 'الألعاب', 'الطبيعة', 'النظافة'],
+                    3: ['القراءة', 'العلم', 'الرياضة', 'البيئة', 'الصحة'],
+                    4: ['التاريخ', 'الجغرافيا', 'الثقافة', 'الفنون', 'التكنولوجيا'],
+                    5: ['الأدب', 'العلوم', 'الاكتشافات', 'الحضارة', 'المستقبل']
+                }
+
+                # Select topic for this grade
+                import random
+                topics = grade_topics.get(grade_level, grade_topics[1])
+                selected_topic = random.choice(topics)
+
+                # Generate RAG-based content with timeout
+                def generate_rag_content():
+                    rag_prompt = f"""
+باستخدام المحتوى التعليمي المتاح، أنشئ نصاً تعليمياً مناسباً للصف {grade_level} عن موضوع "{selected_topic}".
+
+المتطلبات:
+- مستوى الصعوبة: {difficulty_level} ({difficulty_instructions[difficulty_level]})
+- الطول: 80-120 كلمة
+- يجب أن يكون النص تعليمياً ومفيداً
+- استخدم المحتوى من الكتاب كمرجع
+- اجعل النص مشوقاً ومناسباً للعمر
+
+أنشئ نصاً تعليمياً جميلاً ومفيداً:
+"""
+                    return rag.ask(rag_prompt)
+
+                # Execute RAG generation with timeout
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(generate_rag_content)
+                    response = future.result(timeout=60)  # 60 second timeout for generation
+
+                if response.answer and len(response.answer.strip()) > 50:
+                    # Successfully generated RAG content
+                    generated_text = response.answer.strip()
+
+                    # Create and save the generated text to database for future use
+                    new_text = Text(
+                        title=f"نص مولد - {selected_topic} (الصف {grade_level})",
+                        content=generated_text,
+                        content_with_diacritics=generated_text,
+                        grade_level=grade_level,
+                        difficulty_level=difficulty_level,
+                        category=selected_topic,
+                        word_count=len(generated_text.split())
+                    )
+
+                    db.session.add(new_text)
+                    db.session.commit()
+
+                    return jsonify({
+                        'success': True,
+                        'text': {
+                            'id': new_text.id,
+                            'title': new_text.title,
+                            'content': generated_text,
+                            'content_with_diacritics': generated_text,
+                            'difficulty_level': difficulty_level,
+                            'category': selected_topic
+                        },
+                        'rag_generated': True,
+                        'confidence': response.confidence,
+                        'sources_used': len(response.sources)
+                    })
+
+        except (TimeoutError, FutureTimeoutError) as timeout_error:
+            logger.warning(f"RAG generation timed out: {timeout_error}, falling back to demo text")
+
+        except Exception as rag_error:
+            logger.warning(f"RAG generation failed: {rag_error}, falling back to demo text")
+
+            # Fallback to demo text if RAG fails
             # If no text found, create a demo text based on grade level
             demo_texts = {
                 1: {
@@ -325,8 +465,165 @@ from routes.assessment_routes import assessment_bp, init_services
 # Initialize services for assessment routes
 init_services(speech_recognizer, assessment_engine, feedback_generator, learning_system)
 
+# Import and register RAG routes
+from routes.rag_routes import rag_bp
+
 # Register blueprints
 app.register_blueprint(assessment_bp)
+app.register_blueprint(rag_bp)
+
+@app.route('/api/texts/rag-only', methods=['GET'])
+def get_rag_text_only():
+    """Get text generated ONLY using RAG system - no database fallback"""
+    try:
+        grade_level = request.args.get('grade_level', 1, type=int)
+        difficulty_level = request.args.get('difficulty_level', 'easy')
+        bypass_rag = request.args.get('bypass_rag', 'false').lower() == 'true'
+
+        logger.info(f"RAG-only request: grade_level={grade_level}, difficulty_level={difficulty_level}, bypass_rag={bypass_rag}")
+
+        # Quick bypass for testing
+        if bypass_rag:
+            logger.info("Bypassing RAG generation for testing")
+            demo_text = "هذا نص تجريبي بسيط. يمكن للطلاب قراءته لاختبار النظام. النص يحتوي على كلمات واضحة ومفهومة."
+            return jsonify({
+                'success': True,
+                'text': {
+                    'id': 999,
+                    'title': 'نص تجريبي',
+                    'content': demo_text,
+                    'content_with_diacritics': demo_text,
+                    'difficulty_level': difficulty_level,
+                    'category': 'تجريبي'
+                },
+                'rag_generated': False,
+                'confidence': 1.0,
+                'sources_used': 0,
+                'processing_time': 0.1
+            })
+
+        # Initialize RAG system with timeout
+        try:
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+            def rag_initialization_task():
+                from rag import RAGPipeline
+                from dotenv import load_dotenv
+                load_dotenv()
+                rag = RAGPipeline()
+                rag.initialize_system()
+                return rag
+
+            # Use ThreadPoolExecutor with timeout for initialization
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(rag_initialization_task)
+                rag = future.result(timeout=30)  # 30 second timeout for initialization
+
+            # Create difficulty instructions
+            difficulty_instructions = {
+                'easy': 'استخدم كلمات بسيطة وجمل قصيرة',
+                'medium': 'استخدم كلمات متوسطة وجمل معتدلة الطول',
+                'hard': 'استخدم مفردات متقدمة وجمل معقدة'
+            }
+
+            # Grade-specific topics
+            grade_topics = {
+                1: ['الأسرة', 'البيت', 'الألوان', 'الحيوانات', 'الطعام'],
+                2: ['المدرسة', 'الأصدقاء', 'الألعاب', 'الطبيعة', 'النظافة'],
+                3: ['القراءة', 'العلم', 'الرياضة', 'البيئة', 'الصحة'],
+                4: ['التاريخ', 'الجغرافيا', 'الثقافة', 'الفنون', 'التكنولوجيا'],
+                5: ['الأدب', 'العلوم', 'الاكتشافات', 'الحضارة', 'المستقبل']
+            }
+
+            # Select topic for this grade
+            import random
+            topics = grade_topics.get(grade_level, grade_topics[1])
+            selected_topic = random.choice(topics)
+
+            # Generate RAG-based content with timeout
+            def generate_rag_content():
+                rag_prompt = f"""
+باستخدام المحتوى التعليمي المتاح، أنشئ نصاً تعليمياً مناسباً للصف {grade_level} عن موضوع "{selected_topic}".
+
+المتطلبات:
+- مستوى الصعوبة: {difficulty_level} ({difficulty_instructions[difficulty_level]})
+- الطول: 80-120 كلمة
+- يجب أن يكون النص تعليمياً ومفيداً
+- استخدم المحتوى من الكتاب كمرجع
+- اجعل النص مشوقاً ومناسباً للعمر
+
+أنشئ نصاً تعليمياً جميلاً ومفيداً:
+"""
+                return rag.ask(rag_prompt)
+
+            logger.info("Generating RAG content...")
+
+            # Execute RAG generation with timeout
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(generate_rag_content)
+                response = future.result(timeout=60)  # 60 second timeout for generation
+
+            if response.answer and len(response.answer.strip()) > 50:
+                # Successfully generated RAG content
+                generated_text = response.answer.strip()
+
+                # Create and save the generated text to database for future use
+                new_text = Text(
+                    title=f"نص مولد - {selected_topic} (الصف {grade_level})",
+                    content=generated_text,
+                    content_with_diacritics=generated_text,
+                    grade_level=grade_level,
+                    difficulty_level=difficulty_level,
+                    category=selected_topic,
+                    word_count=len(generated_text.split())
+                )
+
+                db.session.add(new_text)
+                db.session.commit()
+
+                logger.info(f"RAG content generated successfully: {len(generated_text)} characters")
+
+                return jsonify({
+                    'success': True,
+                    'text': {
+                        'id': new_text.id,
+                        'title': new_text.title,
+                        'content': generated_text,
+                        'content_with_diacritics': generated_text,
+                        'difficulty_level': difficulty_level,
+                        'category': selected_topic
+                    },
+                    'rag_generated': True,
+                    'confidence': response.confidence,
+                    'sources_used': len(response.sources),
+                    'processing_time': response.processing_time
+                })
+            else:
+                logger.warning("RAG response was empty or too short")
+                raise Exception("RAG response was empty or too short")
+
+        except (TimeoutError, FutureTimeoutError) as timeout_error:
+            logger.error(f"RAG generation timed out: {timeout_error}")
+            return jsonify({
+                'success': False,
+                'message': f'RAG generation timed out after 60 seconds: {str(timeout_error)}',
+                'error_type': 'timeout_error'
+            }), 408
+
+        except Exception as rag_error:
+            logger.error(f"RAG generation failed: {rag_error}")
+            return jsonify({
+                'success': False,
+                'message': f'RAG generation failed: {str(rag_error)}',
+                'error_type': 'rag_error'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error in RAG-only endpoint: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Internal server error: {str(e)}'
+        }), 500
 
 @app.route('/api/generate-text', methods=['POST'])
 def generate_arabic_text():
@@ -925,7 +1222,26 @@ def test_system_status():
             'message': 'خطأ في فحص حالة النظام'
         }), 500
 
+# Check critical environment variables on startup
+def check_environment_variables():
+    """Check if critical environment variables are set"""
+    critical_vars = ['GOOGLE_API_KEY', 'AZURE_SPEECH_KEY', 'AZURE_SPEECH_REGION']
+    missing_vars = []
+
+    for var in critical_vars:
+        if not os.getenv(var):
+            missing_vars.append(var)
+
+    if missing_vars:
+        logger.warning(f"Missing environment variables: {', '.join(missing_vars)}")
+        logger.warning("Some features may not work properly")
+    else:
+        logger.info("All critical environment variables are set")
+
 if __name__ == '__main__':
+    # Check environment variables before starting the app
+    check_environment_variables()
+
     with app.app_context():
         db.create_all()
         logger.info("Database tables created successfully")
@@ -945,3 +1261,7 @@ if __name__ == '__main__':
 
     # Use SocketIO run instead of app.run for WebSocket support
     socketio.run(app, host='0.0.0.0', port=5001, debug=True)
+# Initialize real-time processor
+from services.realtime_processor import RealTimeAudioProcessor
+realtime_processor = RealTimeAudioProcessor(
+    speech_recognizer, assessment_engine, feedback_generator, learning_system)

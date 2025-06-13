@@ -39,6 +39,12 @@ eventlet>=0.33.3
 celery>=5.3.1
 redis>=4.6.0
 
+# RAG System Dependencies
+sentence-transformers>=2.2.2
+faiss-cpu>=1.7.4
+PyPDF2>=3.0.1
+PyMuPDF>=1.23.0  # Better Arabic text extraction from PDFs
+
 # Utilities
 Pillow>=10.0.0
 matplotlib>=3.7.2
