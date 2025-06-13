@@ -773,6 +773,158 @@ def handle_stop_recording():
             'message': 'خطأ في إنهاء التسجيل'
         })
 
+@app.route('/api/generate_preview_audio', methods=['POST'])
+def generate_preview_audio():
+    """Generate TTS preview audio with usage tracking"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        speed = data.get('speed', 'normal')
+        session_id = data.get('session_id', 'demo')
+
+        if not text:
+            return jsonify({
+                'success': False,
+                'error': 'لا يوجد نص للتحويل إلى صوت'
+            }), 400
+
+        # Check usage limits
+        usage_check = feedback_generator.track_preview_usage(session_id, text_preview=True)
+        if not usage_check['allowed']:
+            return jsonify({
+                'success': False,
+                'error': usage_check['message']
+            }), 429
+
+        # Generate TTS audio
+        feedback_generator.cleanup_old_usage_files()  # Clean up periodically
+        result = feedback_generator.generate_text_preview_audio(text, speed)
+
+        if result['success']:
+            # Create URL for the audio file
+            audio_filename = os.path.basename(result['audio_path'])
+            audio_url = f'/api/preview_audio/{audio_filename}'
+
+            return jsonify({
+                'success': True,
+                'audio_path': audio_url,
+                'duration': result['duration'],
+                'speed': result['speed'],
+                'remaining_uses': usage_check['remaining'] - 1,
+                'message': usage_check['message']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error generating preview audio: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'حدث خطأ في تحميل الصوت'
+        }), 500
+
+@app.route('/api/preview_audio/<filename>')
+def serve_preview_audio(filename):
+    """Serve generated preview audio files"""
+    try:
+        # Security check - only allow wav files
+        if not filename.endswith('.wav'):
+            return jsonify({'error': 'نوع الملف غير مدعوم'}), 400
+
+        # Look for file in temporary directory
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        audio_path = os.path.join(temp_dir, filename)
+
+        if os.path.exists(audio_path):
+            return send_file(audio_path, as_attachment=False, mimetype='audio/wav')
+        else:
+            return jsonify({'error': 'الملف الصوتي غير موجود'}), 404
+
+    except Exception as e:
+        logger.error(f"Error serving preview audio: {e}")
+        return jsonify({'error': 'خطأ في تحميل الملف الصوتي'}), 500
+
+@app.route('/api/test/system-status', methods=['GET'])
+def test_system_status():
+    """Test endpoint to check if all system components are working"""
+    try:
+        status = {
+            'speech_recognition': {
+                'wav2vec2': False,
+                'azure': False
+            },
+            'ai_assessment': {
+                'gemini': False
+            },
+            'tts': {
+                'azure': False
+            },
+            'database': False
+        }
+
+        # Test Wav2Vec2
+        try:
+            if speech_recognizer.wav2vec2_model is not None:
+                status['speech_recognition']['wav2vec2'] = True
+        except:
+            pass
+
+        # Test Azure Speech
+        try:
+            if speech_recognizer.azure_speech_config is not None:
+                status['speech_recognition']['azure'] = True
+        except:
+            pass
+
+        # Test Gemini
+        try:
+            if assessment_engine.gemini_model is not None:
+                status['ai_assessment']['gemini'] = True
+        except:
+            pass
+
+        # Test Azure TTS
+        try:
+            if feedback_generator.azure_speech_config is not None:
+                status['tts']['azure'] = True
+        except:
+            pass
+
+        # Test Database
+        try:
+            from models.database import db
+            result = db.session.execute(db.text('SELECT 1')).scalar()
+            if result == 1:
+                status['database'] = True
+        except Exception as e:
+            logger.warning(f"Database health check failed: {e}")
+            pass
+
+        overall_status = all([
+            status['speech_recognition']['wav2vec2'],
+            status['ai_assessment']['gemini'],
+            status['database']
+        ])
+
+        return jsonify({
+            'success': True,
+            'overall_healthy': overall_status,
+            'components': status,
+            'message': 'النظام يعمل بشكل صحيح' if overall_status else 'بعض المكونات لا تعمل بشكل صحيح'
+        })
+
+    except Exception as e:
+        logger.error(f"Error in system status check: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'خطأ في فحص حالة النظام'
+        }), 500
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

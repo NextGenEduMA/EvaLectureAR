@@ -42,59 +42,101 @@ def allowed_file(filename):
 def create_assessment():
     """Create a new assessment from uploaded audio"""
     try:
+        logger.info(f"Assessment request received - Files: {list(request.files.keys())}, Form: {dict(request.form)}")
+        
         # Validate request
         if 'audio' not in request.files:
+            logger.error("No audio file in request")
             return jsonify({
                 'success': False,
                 'message': 'No audio file provided'
             }), 400
-        
+
         audio_file = request.files['audio']
+        logger.info(f"Audio file received: {audio_file.filename}, size: {len(audio_file.read())} bytes")
+        audio_file.seek(0)  # Reset file pointer after reading for size
+        
         if audio_file.filename == '':
+            logger.error("Empty audio filename")
             return jsonify({
                 'success': False,
                 'message': 'No audio file selected'
             }), 400
-        
+
         if not allowed_file(audio_file.filename):
+            logger.error(f"Invalid file format: {audio_file.filename}")
             return jsonify({
                 'success': False,
                 'message': 'Invalid file format. Supported formats: wav, mp3, m4a, ogg, flac'
             }), 400
-        
+
         # Get form data
-        student_id = request.form.get('student_id', type=int)
-        text_id = request.form.get('text_id', type=int)
+        student_id_raw = request.form.get('student_id')
+        text_id_raw = request.form.get('text_id')
         
-        if not student_id or not text_id:
+        logger.info(f"Received student_id: {student_id_raw}, text_id: {text_id_raw}")
+        
+        # Handle 'demo' values and convert to integers
+        try:
+            if student_id_raw == 'demo_student':
+                # Get the first available student for demo
+                student = Student.query.first()
+                if not student:
+                    return jsonify({
+                        'success': False,
+                        'message': 'No students available for demo'
+                    }), 400
+                student_id = student.id
+            else:
+                student_id = int(student_id_raw)
+        except (ValueError, TypeError):
             return jsonify({
                 'success': False,
-                'message': 'Student ID and Text ID are required'
+                'message': 'Invalid student ID format'
             }), 400
-        
-        # Validate student and text exist
-        student = Student.query.get(student_id)
-        text = Text.query.get(text_id)
-        
-        if not student:
+            
+        try:
+            if text_id_raw == 'demo':
+                # Get the first available text for demo
+                text = Text.query.first()
+                if not text:
+                    return jsonify({
+                        'success': False,
+                        'message': 'No texts available for demo'
+                    }), 400
+                text_id = text.id
+            else:
+                text_id = int(text_id_raw)
+        except (ValueError, TypeError):
             return jsonify({
                 'success': False,
-                'message': 'Student not found'
-            }), 404
-        
-        if not text:
-            return jsonify({
-                'success': False,
-                'message': 'Text not found'
-            }), 404
-        
+                'message': 'Invalid text ID format'
+            }), 400
+
+        # Validate student and text exist (if not already found in demo handling)
+        if student_id_raw != 'demo_student':
+            student = Student.query.get(student_id)
+            if not student:
+                return jsonify({
+                    'success': False,
+                    'message': 'Student not found'
+                }), 404
+
+        if text_id_raw != 'demo':
+            text = Text.query.get(text_id)
+            if not text:
+                return jsonify({
+                    'success': False,
+                    'message': 'Text not found'
+                }), 404
+
         # Save uploaded audio file
         filename = secure_filename(audio_file.filename)
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         audio_filename = f"{student_id}_{text_id}_{timestamp}_{filename}"
         audio_path = os.path.join(UPLOAD_FOLDER, audio_filename)
         audio_file.save(audio_path)
-        
+
         # Create assessment record
         assessment = Assessment(
             student_id=student_id,
@@ -102,10 +144,10 @@ def create_assessment():
             original_audio_path=audio_path,
             status='processing'
         )
-        
+
         db.session.add(assessment)
         db.session.commit()
-        
+
         # Process assessment asynchronously (in a real app, use Celery)
         try:
             result = process_assessment_sync(assessment.id, audio_path, text.content)
@@ -124,12 +166,12 @@ def create_assessment():
                 'message': 'Assessment processing failed',
                 'assessment_id': assessment.id
             }), 500
-        
+
     except Exception as e:
-        logger.error(f"Error creating assessment: {e}")
+        logger.error(f"Error creating assessment: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'message': 'Internal server error'
+            'message': f'Internal server error: {str(e)}'
         }), 500
 
 def process_assessment_sync(assessment_id: int, audio_path: str, reference_text: str):
@@ -138,45 +180,65 @@ def process_assessment_sync(assessment_id: int, audio_path: str, reference_text:
         assessment = Assessment.query.get(assessment_id)
         if not assessment:
             raise Exception("Assessment not found")
-        
+
         # Step 1: Speech Recognition
         logger.info(f"Starting speech recognition for assessment {assessment_id}")
         transcription_result = speech_recognizer.transcribe_audio(audio_path, reference_text)
-        
+
+        # Debug logging
+        logger.info(f"Transcription result: {transcription_result}")
+        logger.info(f"Best transcription: {transcription_result.get('best_transcription', {})}")
+
+        # Check if transcription is empty
+        best_transcription = transcription_result.get('best_transcription', {})
+        transcribed_text = best_transcription.get('transcription', '').strip()
+        confidence_score = best_transcription.get('confidence', 0)
+
+        if not transcribed_text:
+            logger.warning(f"Empty transcription for assessment {assessment_id}")
+            # Still proceed but with warning
+
         # Update assessment with transcription
-        assessment.transcribed_text = transcription_result['best_transcription']['transcription']
-        assessment.confidence_score = transcription_result['best_transcription']['confidence']
-        assessment.reading_duration = transcription_result['audio_duration']
-        
+        assessment.transcribed_text = transcribed_text
+        assessment.confidence_score = confidence_score
+        assessment.reading_duration = transcription_result.get('audio_duration', 0)
+
         # Step 2: AI Assessment
         logger.info(f"Starting AI assessment for assessment {assessment_id}")
+        logger.info(f"Reference text: '{reference_text}'")
+        logger.info(f"Transcribed text: '{assessment.transcribed_text}'")
+        logger.info(f"Reading duration: {assessment.reading_duration}")
+
         ai_assessment = assessment_engine.generate_comprehensive_assessment(
             original_text=reference_text,
             transcribed_text=assessment.transcribed_text,
             audio_duration=assessment.reading_duration,
             pronunciation_details=transcription_result.get('pronunciation_assessment')
         )
-        
-        # Update assessment with AI results
+
+        # Debug AI assessment result
+        logger.info(f"AI assessment result: {ai_assessment}")
+
+        # Update assessment with AI results - with fallback values
         assessment.overall_score = ai_assessment.get('overall_score', 0)
         assessment.pronunciation_score = ai_assessment.get('pronunciation_score', 0)
         assessment.fluency_score = ai_assessment.get('fluency_score', 0)
         assessment.accuracy_score = ai_assessment.get('accuracy_score', 0)
         assessment.comprehension_score = ai_assessment.get('comprehension_score', 0)
         assessment.errors_detected = ai_assessment.get('errors', [])
-        assessment.feedback_text = ai_assessment.get('feedback', '')
+        assessment.feedback_text = ai_assessment.get('feedback', 'تم إكمال التقييم. يرجى المراجعة.')
         assessment.recommendations = ai_assessment.get('recommendations', [])
-        
+
         # Calculate words per minute
         word_count = len(reference_text.split())
         if assessment.reading_duration > 0:
             assessment.words_per_minute = (word_count / assessment.reading_duration) * 60
-        
+
         # Step 3: Generate Feedback
         logger.info(f"Generating feedback for assessment {assessment_id}")
         feedback_dir = os.path.join(AUDIO_CACHE_FOLDER, f"assessment_{assessment_id}")
         os.makedirs(feedback_dir, exist_ok=True)
-        
+
         # Generate comprehensive feedback package
         feedback_package = feedback_generator.generate_comprehensive_feedback_package(
             {
@@ -187,7 +249,7 @@ def process_assessment_sync(assessment_id: int, audio_path: str, reference_text:
             },
             feedback_dir
         )
-        
+
         # Save audio feedback paths
         if feedback_package.get('progressive_reading'):
             audio_feedback = AudioFeedback(
@@ -199,7 +261,7 @@ def process_assessment_sync(assessment_id: int, audio_path: str, reference_text:
                 generation_method='azure_tts'
             )
             db.session.add(audio_feedback)
-        
+
         # Save pronunciation errors
         for error in assessment.errors_detected:
             pronunciation_error = PronunciationError(
@@ -212,7 +274,7 @@ def process_assessment_sync(assessment_id: int, audio_path: str, reference_text:
                 feedback_message=error.get('message', '')
             )
             db.session.add(pronunciation_error)
-        
+
         # Step 4: Update Learning Management
         logger.info(f"Updating student progress for assessment {assessment_id}")
         learning_system.update_student_progress(
@@ -227,13 +289,13 @@ def process_assessment_sync(assessment_id: int, audio_path: str, reference_text:
                 'audio_duration': assessment.reading_duration
             }
         )
-        
+
         # Mark assessment as completed
         assessment.status = 'completed'
         assessment.completed_at = datetime.utcnow()
-        
+
         db.session.commit()
-        
+
         # Return comprehensive result
         return {
             'assessment_id': assessment_id,
@@ -258,7 +320,7 @@ def process_assessment_sync(assessment_id: int, audio_path: str, reference_text:
             'recommendations': assessment.recommendations,
             'audio_feedback_available': bool(feedback_package.get('progressive_reading'))
         }
-        
+
     except Exception as e:
         logger.error(f"Error processing assessment {assessment_id}: {e}")
         # Mark assessment as failed
@@ -277,13 +339,13 @@ def get_assessment(assessment_id):
                 'success': False,
                 'message': 'Assessment not found'
             }), 404
-        
+
         # Get related data
         student = Student.query.get(assessment.student_id)
         text = Text.query.get(assessment.text_id)
         audio_feedback = AudioFeedback.query.filter_by(assessment_id=assessment_id).first()
         pronunciation_errors = PronunciationError.query.filter_by(assessment_id=assessment_id).all()
-        
+
         result = {
             'success': True,
             'assessment': {
@@ -291,24 +353,24 @@ def get_assessment(assessment_id):
                 'status': assessment.status,
                 'created_at': assessment.created_at.isoformat(),
                 'completed_at': assessment.completed_at.isoformat() if assessment.completed_at else None,
-                
+
                 'student': {
                     'id': student.id,
                     'name': student.name,
                     'level': student.level
                 } if student else None,
-                
+
                 'text': {
                     'id': text.id,
                     'title': text.title,
                     'content': text.content
                 } if text else None,
-                
+
                 'transcription': {
                     'text': assessment.transcribed_text,
                     'confidence': assessment.confidence_score
                 },
-                
+
                 'scores': {
                     'overall': assessment.overall_score,
                     'pronunciation': assessment.pronunciation_score,
@@ -316,16 +378,16 @@ def get_assessment(assessment_id):
                     'accuracy': assessment.accuracy_score,
                     'comprehension': assessment.comprehension_score
                 },
-                
+
                 'metrics': {
                     'reading_duration': assessment.reading_duration,
                     'words_per_minute': assessment.words_per_minute
                 },
-                
+
                 'errors': assessment.errors_detected or [],
                 'feedback': assessment.feedback_text,
                 'recommendations': assessment.recommendations or [],
-                
+
                 'pronunciation_errors': [{
                     'id': error.id,
                     'word_position': error.word_position,
@@ -335,7 +397,7 @@ def get_assessment(assessment_id):
                     'severity': error.severity,
                     'feedback_message': error.feedback_message
                 } for error in pronunciation_errors],
-                
+
                 'audio_feedback': {
                     'slow_reading_available': bool(audio_feedback and audio_feedback.slow_reading_path),
                     'normal_reading_available': bool(audio_feedback and audio_feedback.normal_reading_path),
@@ -343,9 +405,9 @@ def get_assessment(assessment_id):
                 } if audio_feedback else None
             }
         }
-        
+
         return jsonify(result)
-        
+
     except Exception as e:
         logger.error(f"Error getting assessment: {e}")
         return jsonify({
@@ -362,14 +424,14 @@ def get_feedback_audio(assessment_id, speed):
                 'success': False,
                 'message': 'Invalid speed. Use: slow, normal, or fast'
             }), 400
-        
+
         audio_feedback = AudioFeedback.query.filter_by(assessment_id=assessment_id).first()
         if not audio_feedback:
             return jsonify({
                 'success': False,
                 'message': 'Audio feedback not found'
             }), 404
-        
+
         # Get appropriate audio file path
         audio_path = None
         if speed == 'slow':
@@ -378,15 +440,15 @@ def get_feedback_audio(assessment_id, speed):
             audio_path = audio_feedback.normal_reading_path
         elif speed == 'fast':
             audio_path = audio_feedback.fast_reading_path
-        
+
         if not audio_path or not os.path.exists(audio_path):
             return jsonify({
                 'success': False,
                 'message': f'{speed.capitalize()} reading audio not available'
             }), 404
-        
+
         return send_file(audio_path, as_attachment=True)
-        
+
     except Exception as e:
         logger.error(f"Error getting feedback audio: {e}")
         return jsonify({
@@ -405,19 +467,19 @@ def get_student_assessments(student_id):
                 'success': False,
                 'message': 'Student not found'
             }), 404
-        
+
         # Get query parameters
         limit = request.args.get('limit', 10, type=int)
         status = request.args.get('status')
-        
+
         # Build query
         query = Assessment.query.filter_by(student_id=student_id)
-        
+
         if status:
             query = query.filter_by(status=status)
-        
+
         assessments = query.order_by(Assessment.created_at.desc()).limit(limit).all()
-        
+
         result = {
             'success': True,
             'student': {
@@ -434,9 +496,9 @@ def get_student_assessments(student_id):
                 'completed_at': assessment.completed_at.isoformat() if assessment.completed_at else None
             } for assessment in assessments]
         }
-        
+
         return jsonify(result)
-        
+
     except Exception as e:
         logger.error(f"Error getting student assessments: {e}")
         return jsonify({

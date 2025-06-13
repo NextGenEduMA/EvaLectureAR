@@ -107,44 +107,113 @@
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
+            position: relative;
+            overflow: hidden;
         }
 
         .btn-record {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
             color: white;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-record:hover {
+            background: linear-gradient(135deg, #229954, #27ae60);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
         }
 
         .btn-record.recording {
-            background: linear-gradient(135deg, #e67e22, #d35400);
-            animation: pulse 1.5s infinite;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            animation: recordingPulse 1s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(231, 76, 60, 0.6);
+        }
+
+        .btn-record.recording::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 2px solid #e74c3c;
+            border-radius: 12px;
+            opacity: 0.7;
+            animation: recordingRing 1.5s infinite;
+        }
+
+        .btn-record.recording .btn-text {
+            animation: recordingText 0.8s ease-in-out infinite alternate;
         }
 
         .btn-stop {
-            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            background: linear-gradient(135deg, #e67e22, #d35400);
             color: white;
+            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
+        }
+
+        .btn-stop:hover {
+            background: linear-gradient(135deg, #d35400, #e67e22);
+            box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
         }
 
         .btn-new-text {
             background: linear-gradient(135deg, #3498db, #2980b9);
             color: white;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-new-text:hover {
+            background: linear-gradient(135deg, #2980b9, #3498db);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
         }
 
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         .btn:disabled {
-            background: #bdc3c7;
+            background: linear-gradient(135deg, #bdc3c7, #95a5a6) !important;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
+            animation: none;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+        .btn:disabled::before {
+            display: none;
+        }
+
+        @keyframes recordingPulse {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 20px rgba(231, 76, 60, 0.6);
+            }
+            50% { 
+                transform: scale(1.05);
+                box-shadow: 0 0 30px rgba(231, 76, 60, 0.8);
+            }
+        }
+
+        @keyframes recordingRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.3;
+            }
+            100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        @keyframes recordingText {
+            0% { opacity: 0.8; }
+            100% { opacity: 1; }
         }
 
         .status {
@@ -328,6 +397,106 @@
             box-shadow: 0 5px 15px rgba(142, 68, 173, 0.3);
         }
 
+        .preview-section {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .preview-section h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+
+        .preview-section p {
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+
+        .preview-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn-listen {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+        }
+
+        .btn-listen:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .preview-info {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 10px;
+            color: #155724;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .preview-status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .preview-status.success {
+            background: #d1edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .preview-status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .preview-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .audio-player {
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .audio-player audio {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 8px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -381,15 +550,36 @@
 
             <div id="status" class="status"></div>
 
+            <!-- Listen Preview Section -->
+            <div class="preview-section" id="previewSection">
+                <h3>🔊 استمع للنص أولاً (اختياري)</h3>
+                <p>يمكنك الاستماع للنص 3 مرات قبل البدء في القراءة - أو التسجيل مباشرة</p>
+                <div class="preview-controls">
+                    <button id="listenBtn" class="btn btn-listen">
+                        🔊 استمع للنص (<span id="listenCount">3</span> مرات متبقية)
+                    </button>
+                </div>
+                <div class="audio-player" id="audioPlayer" style="display: none;">
+                    <audio controls preload="none" id="previewAudio">
+                        <source src="" type="audio/wav">
+                        متصفحك لا يدعم تشغيل الصوت
+                    </audio>
+                </div>
+                <div class="preview-info">
+                    <p>💡 استمع بعناية ثم حاول أن تقرأ النص بنفس الطريقة، أو ابدأ التسجيل مباشرة</p>
+                    <div id="previewStatus" class="preview-status"></div>
+                </div>
+            </div>
+
             <div class="controls">
                 <button id="recordBtn" class="btn btn-record">
-                    🎤 ابدأ التسجيل
+                    <span class="btn-text">🎤 ابدأ التسجيل</span>
                 </button>
                 <button id="stopBtn" class="btn btn-stop" disabled>
-                    ⏹️ إيقاف التسجيل
+                    <span class="btn-text">⏹️ إيقاف التسجيل</span>
                 </button>
                 <button id="newTextBtn" class="btn btn-new-text">
-                    🔄 نص جديد
+                    <span class="btn-text">🔄 نص جديد</span>
                 </button>
             </div>
         </div>
@@ -457,23 +647,38 @@
         let currentText = null;
         let isRecording = false;
         let recordingSession = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let audioStream = null;
 
         // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             loadStudentInfo();
             initializeSocketIO();
-            loadRandomText();
+            await loadRandomText();
             setupEventListeners();
+
+            // Initialize microphone access
+            await initializeMicrophone();
         });
 
         function loadStudentInfo() {
             const studentData = localStorage.getItem('currentStudent');
             if (!studentData) {
-                window.location.href = '/';
-                return;
+                console.log('No student data found, creating demo student');
+                // Create a demo student instead of redirecting
+                currentStudent = {
+                    id: 'demo_student',
+                    name: 'طالب تجريبي',
+                    grade_level: 3,
+                    difficulty_level: 'medium'
+                };
+                // Save to localStorage for future use
+                localStorage.setItem('currentStudent', JSON.stringify(currentStudent));
+            } else {
+                currentStudent = JSON.parse(studentData);
             }
 
-            currentStudent = JSON.parse(studentData);
             document.getElementById('studentName').textContent = currentStudent.name;
             document.getElementById('studentGrade').textContent = `الصف ${currentStudent.grade_level}`;
 
@@ -486,10 +691,12 @@
         }
 
         function initializeSocketIO() {
+            console.log('Initializing Socket.IO...');
             socket = io();
 
             socket.on('connect', function() {
                 console.log('Connected to server');
+                console.log('Socket ID:', socket.id);
                 showStatus('تم الاتصال بالخادم بنجاح', 'success');
             });
 
@@ -554,6 +761,10 @@
                     document.getElementById('textContainer').innerHTML =
                         `<div style="color: #2c3e50; font-weight: 600;">${currentText.content}</div>`;
                 }
+
+                // Reset preview functionality for new text
+                resetPreviewForNewText();
+
             } catch (error) {
                 console.error('Error loading text:', error);
                 showStatus('خطأ في تحميل النص', 'error');
@@ -564,45 +775,251 @@
             document.getElementById('recordBtn').addEventListener('click', startRecording);
             document.getElementById('stopBtn').addEventListener('click', stopRecording);
             document.getElementById('newTextBtn').addEventListener('click', loadRandomText);
+
+            // Preview functionality
+            document.getElementById('listenBtn').addEventListener('click', () => generatePreviewAudio('normal'));
         }
 
-        function startRecording() {
+        async function startRecording() {
+            console.log('startRecording called');
+            console.log('currentText:', currentText);
+            console.log('currentStudent:', currentStudent);
+            console.log('socket connected:', socket && socket.connected);
+
             if (!currentText) {
                 showStatus('يرجى تحميل النص أولاً', 'warning');
                 return;
             }
 
-            isRecording = true;
-            document.getElementById('recordBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-            document.getElementById('recordBtn').classList.add('recording');
+            if (!socket || !socket.connected) {
+                showStatus('لا يوجد اتصال بالخادم. يرجى إعادة تحميل الصفحة.', 'error');
+                return;
+            }
 
-            // Start recording session
-            socket.emit('start_recording', {
-                student_id: currentStudent.id,
-                text_id: currentText.id || 'demo'
-            });
+            // Ensure we have microphone access
+            if (!audioStream) {
+                console.log('No audio stream, requesting microphone access...');
+                const micReady = await initializeMicrophone();
+                if (!micReady) {
+                    return;
+                }
+            }
 
-            // Start capturing audio (simplified for demo)
-            showStatus('بدأ التسجيل - اقرأ النص الآن', 'info');
+            // Ensure we have a student (fallback to demo student)
+            if (!currentStudent) {
+                console.log('No current student, creating demo student');
+                currentStudent = {
+                    id: 'demo_student',
+                    name: 'طالب تجريبي',
+                    grade_level: 3,
+                    difficulty_level: 'medium'
+                };
+            }
+
+            try {
+                isRecording = true;
+                audioChunks = [];
+                
+                // Update button UI
+                const recordBtn = document.getElementById('recordBtn');
+                const stopBtn = document.getElementById('stopBtn');
+                
+                if (recordBtn && stopBtn) {
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    recordBtn.classList.add('recording');
+                    
+                    // Change button text with animation
+                    const recordBtnText = recordBtn.querySelector('.btn-text');
+                    const stopBtnText = stopBtn.querySelector('.btn-text');
+                    
+                    if (recordBtnText) recordBtnText.textContent = '🔴 جاري التسجيل...';
+                    if (stopBtnText) stopBtnText.textContent = '⏹️ إيقاف التسجيل';
+                }
+
+                // Store stream reference for cleanup
+                window.currentStream = audioStream;
+
+                // Create MediaRecorder
+                mediaRecorder = new MediaRecorder(audioStream);
+
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        console.log('Audio chunk received:', event.data.size, 'bytes');
+                    }
+                };
+
+                mediaRecorder.onstop = function() {
+                    console.log('MediaRecorder stopped');
+                    // Update isRecording state immediately
+                    isRecording = false;
+                    
+                    if (audioChunks.length > 0) {
+                        processRecording();
+                    } else {
+                        console.log('No audio chunks to process');
+                        resetRecordingState();
+                    }
+                };
+
+                mediaRecorder.onerror = function(event) {
+                    console.error('MediaRecorder error:', event.error);
+                    showStatus('خطأ في التسجيل: ' + event.error, 'error');
+                    resetRecordingState();
+                };
+
+                // Start recording
+                mediaRecorder.start();
+                console.log('MediaRecorder started');
+
+                console.log('Emitting start_recording event');
+                // Notify server about recording session
+                socket.emit('start_recording', {
+                    student_id: currentStudent.id,
+                    text_id: currentText.id || 'demo'
+                });
+
+                showStatus('بدأ التسجيل - اقرأ النص الآن', 'info');
+
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                showStatus('فشل في بدء التسجيل: ' + error.message, 'error');
+                resetRecordingState();
+            }
         }
 
         function stopRecording() {
             if (!isRecording) return;
 
-            isRecording = false;
-            document.getElementById('stopBtn').disabled = true;
+            console.log('stopRecording called');
+            
+            // Immediately update UI state
+            const stopBtn = document.getElementById('stopBtn');
+            if (stopBtn) {
+                stopBtn.disabled = true;
+            }
 
-            // Stop recording
-            socket.emit('stop_recording');
+            // Stop MediaRecorder if active
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                try {
+                    console.log('Stopping MediaRecorder...');
+                    mediaRecorder.stop();
+                } catch (e) {
+                    console.warn('Error stopping MediaRecorder:', e);
+                    // Force reset if there's an error
+                    resetRecordingState();
+                }
+            } else {
+                // No active recorder, force reset
+                resetRecordingState();
+            }
+
             showStatus('تم إيقاف التسجيل - جاري المعالجة...', 'info');
         }
 
+        async function processRecording() {
+            console.log('Processing recording...');
+            console.log('Audio chunks:', audioChunks.length);
+
+            if (audioChunks.length === 0) {
+                showStatus('لم يتم تسجيل أي صوت', 'warning');
+                resetRecordingState();
+                return;
+            }
+
+            try {
+                // Create audio blob
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                console.log('Audio blob size:', audioBlob.size, 'bytes');
+
+                if (audioBlob.size < 1000) { // Less than 1KB
+                    showStatus('التسجيل قصير جداً. يرجى المحاولة مرة أخرى.', 'warning');
+                    resetRecordingState();
+                    return;
+                }
+
+                // Create FormData for upload
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+                formData.append('student_id', currentStudent.id);
+                formData.append('text_id', currentText.id || 'demo');
+                formData.append('text_content', currentText.content);
+
+                showStatus('جاري رفع التسجيل وتحليل الأداء...', 'info');
+
+                // Upload to server
+                const response = await fetch('/api/assessments', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('Assessment API response:', result); // Debug log
+
+                if (result.success) {
+                    showStatus('تم إكمال التقييم بنجاح!', 'success');
+                    // Use the assessment data directly from the API response
+                    const assessmentData = result.result || result;
+                    console.log('Assessment data from API:', assessmentData); // Debug log
+                    displayResults(assessmentData);
+                } else {
+                    console.error('Assessment failed:', result); // Debug log
+                    showStatus('خطأ في التقييم: ' + (result.error || result.message || 'خطأ غير معروف'), 'error');
+                }
+
+            } catch (error) {
+                console.error('Error processing recording:', error);
+                showStatus('فشل في معالجة التسجيل: ' + error.message, 'error');
+            } finally {
+                resetRecordingState();
+            }
+        }
+
         function resetRecordingState() {
+            console.log('Resetting recording state');
             isRecording = false;
-            document.getElementById('recordBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            document.getElementById('recordBtn').classList.remove('recording');
+            
+            // Update button UI
+            const recordBtn = document.getElementById('recordBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            
+            if (recordBtn && stopBtn) {
+                // Enable record button, disable stop button
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                
+                // Remove recording visual state
+                recordBtn.classList.remove('recording');
+                
+                // Restore original button texts
+                const recordBtnText = recordBtn.querySelector('.btn-text');
+                const stopBtnText = stopBtn.querySelector('.btn-text');
+                
+                if (recordBtnText) recordBtnText.textContent = '🎤 ابدأ التسجيل';
+                if (stopBtnText) stopBtnText.textContent = '⏹️ إيقاف التسجيل';
+            }
+
+            // Clean up MediaRecorder
+            if (mediaRecorder) {
+                try {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                } catch (e) {
+                    console.warn('Error stopping MediaRecorder:', e);
+                }
+                mediaRecorder = null;
+            }
+
+            // Clear audio chunks
+            audioChunks = [];
+            
+            // Clear any stream references
+            if (window.currentStream) {
+                window.currentStream.getTracks().forEach(track => track.stop());
+                window.currentStream = null;
+            }
         }
 
         function showStatus(message, type) {
@@ -619,25 +1036,254 @@
             }
         }
 
+        // Text-to-Speech Preview functionality
+        let listenCount = 3;
+        let currentPreviewAudio = null;
+
+        function generatePreviewAudio(speed = 'normal') {
+            if (!currentText || !currentText.content) {
+                showPreviewStatus('لا يوجد نص للاستماع إليه', 'error');
+                return;
+            }
+
+            if (listenCount <= 0) {
+                showPreviewStatus('تم استنفاد محاولات الاستماع المسموحة', 'warning');
+                return;
+            }
+
+            // Show loading
+            const btnElement = document.getElementById('listenBtn');
+            const originalText = btnElement.innerHTML;
+            btnElement.innerHTML = `<span class="loading-spinner"></span> جاري التحميل...`;
+            btnElement.disabled = true;
+
+            // Make request to generate audio
+            fetch('/api/generate_preview_audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: currentText.content,
+                    speed: 'normal', // Always use normal speed
+                    session_id: currentStudent.id || 'demo'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    playPreviewAudio(data.audio_path);
+                    listenCount--;
+                    updateListenCount();
+                    showPreviewStatus('تم تشغيل النص - يمكنك الآن البدء في القراءة', 'success');
+                } else {
+                    showPreviewStatus(data.error || 'فشل في تحميل الصوت. يمكنك البدء في التسجيل بدون استماع.', 'warning');
+                }
+            })
+            .catch(error => {
+                console.error('Error generating preview:', error);
+                showPreviewStatus('حدث خطأ في تحميل الصوت. يمكنك البدء في التسجيل بدون استماع.', 'warning');
+            })
+            .finally(() => {
+                // Restore button
+                btnElement.innerHTML = originalText;
+                btnElement.disabled = listenCount <= 0;
+            });
+        }
+
+        function playPreviewAudio(audioPath) {
+            const audioPlayer = document.getElementById('audioPlayer');
+            const audioElement = document.getElementById('previewAudio');
+
+            // Stop current audio if playing
+            if (currentPreviewAudio) {
+                currentPreviewAudio.pause();
+                currentPreviewAudio.currentTime = 0;
+            }
+
+            // Set new audio source
+            audioElement.src = audioPath;
+            currentPreviewAudio = audioElement;
+
+            // Show audio player
+            audioPlayer.style.display = 'block';
+
+            // Play audio
+            audioElement.play().catch(error => {
+                console.error('Error playing audio:', error);
+                showPreviewStatus('فشل في تشغيل الصوت', 'error');
+            });
+
+            // Handle audio events
+            audioElement.onended = function() {
+                showPreviewStatus('انتهى تشغيل النص - يمكنك الآن البدء في القراءة', 'success');
+            };
+
+            audioElement.onerror = function() {
+                showPreviewStatus('حدث خطأ في تشغيل الصوت', 'error');
+            };
+        }
+
+        function updateListenCount() {
+            document.getElementById('listenCount').textContent = listenCount;
+
+            // Disable buttons if no attempts left
+            if (listenCount <= 0) {
+                document.getElementById('listenBtn').disabled = true;
+                document.getElementById('listenSlowBtn').disabled = true;
+                document.getElementById('listenFastBtn').disabled = true;
+                document.getElementById('recordBtn').disabled = false; // Enable recording
+                showPreviewStatus('لا توجد محاولات استماع متبقية - يمكنك الآن البدء في التسجيل', 'warning');
+            }
+        }
+
+        function showPreviewStatus(message, type) {
+            const statusElement = document.getElementById('previewStatus');
+            statusElement.textContent = message;
+            statusElement.className = `preview-status ${type}`;
+            statusElement.style.display = 'block';
+
+            // Auto-hide after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function resetPreviewForNewText() {
+            listenCount = 3;
+            updateListenCount();
+
+            // Reset button states - record button is always enabled
+            document.getElementById('listenBtn').disabled = false;
+            document.getElementById('recordBtn').disabled = false; // Always enabled
+
+            // Hide audio player
+            document.getElementById('audioPlayer').style.display = 'none';
+            document.getElementById('previewStatus').style.display = 'none';
+
+            // Stop any playing audio
+            if (currentPreviewAudio) {
+                currentPreviewAudio.pause();
+                currentPreviewAudio.currentTime = 0;
+                currentPreviewAudio = null;
+            }
+        }
+
         function displayResults(results) {
+            console.log('displayResults called with:', results); // Debug log
+            console.log('typeof results:', typeof results);
+            console.log('results keys:', Object.keys(results || {}));
+
+            if (!results) {
+                console.error('Results is null or undefined');
+                showStatus('خطأ: لم يتم استلام نتائج التقييم', 'error');
+                return;
+            }
+
             const resultsSection = document.getElementById('resultsSection');
 
-            // Show overall score
-            const overallScore = Math.round(results.overall_score || 0);
+            // Handle nested result structure - check multiple possible locations for scores
+            const assessmentData = results.result || results;
+            console.log('Assessment data:', assessmentData); // Debug log
+            console.log('Assessment data keys:', Object.keys(assessmentData || {}));
+
+            // Try to extract scores from various possible structures
+            let overallScore, pronunciationScore, fluencyScore, accuracyScore, comprehensionScore;
+
+            // Check if scores are in the scores object (backend format)
+            if (assessmentData.scores && typeof assessmentData.scores === 'object') {
+                const scores = assessmentData.scores;
+                overallScore = scores.overall || scores.overall_score || 0;
+                pronunciationScore = scores.pronunciation || scores.pronunciation_score || 0;
+                fluencyScore = scores.fluency || scores.fluency_score || 0;
+                accuracyScore = scores.accuracy || scores.accuracy_score || 0;
+                comprehensionScore = scores.comprehension || scores.comprehension_score || 0;
+                
+                console.log('Scores object extraction:', {
+                    overall: overallScore,
+                    pronunciation: pronunciationScore,
+                    fluency: fluencyScore,
+                    accuracy: accuracyScore,
+                    comprehension: comprehensionScore
+                });
+            } 
+            // Fallback: Direct extraction from top level
+            else {
+                overallScore = assessmentData.overall_score || assessmentData.overall || 0;
+                pronunciationScore = assessmentData.pronunciation_score || assessmentData.pronunciation || 0;
+                fluencyScore = assessmentData.fluency_score || assessmentData.fluency || 0;
+                accuracyScore = assessmentData.accuracy_score || assessmentData.accuracy || 0;
+                comprehensionScore = assessmentData.comprehension_score || assessmentData.comprehension || 0;
+                
+                console.log('Direct extraction:', {
+                    overall: overallScore,
+                    pronunciation: pronunciationScore,
+                    fluency: fluencyScore,
+                    accuracy: accuracyScore,
+                    comprehension: comprehensionScore
+                });
+            }
+
+            // If still no scores found, try nested result object
+            if (!overallScore && assessmentData.result && typeof assessmentData.result === 'object') {
+                const result = assessmentData.result;
+                if (result.scores) {
+                    const scores = result.scores;
+                    overallScore = scores.overall || scores.overall_score || 0;
+                    pronunciationScore = scores.pronunciation || scores.pronunciation_score || 0;
+                    fluencyScore = scores.fluency || scores.fluency_score || 0;
+                    accuracyScore = scores.accuracy || scores.accuracy_score || 0;
+                    comprehensionScore = scores.comprehension || scores.comprehension_score || 0;
+                } else {
+                    overallScore = result.overall_score || result.overall || 0;
+                    pronunciationScore = result.pronunciation_score || result.pronunciation || 0;
+                    fluencyScore = result.fluency_score || result.fluency || 0;
+                    accuracyScore = result.accuracy_score || result.accuracy || 0;
+                    comprehensionScore = result.comprehension_score || result.comprehension || 0;
+                }
+                
+                console.log('Nested result extraction:', {
+                    overall: overallScore,
+                    pronunciation: pronunciationScore,
+                    fluency: fluencyScore,
+                    accuracy: accuracyScore,
+                    comprehension: comprehensionScore
+                });
+            }
+
+            // Ensure all scores are valid numbers
+            overallScore = Math.round(parseFloat(overallScore) || 0);
+            pronunciationScore = Math.round(parseFloat(pronunciationScore) || 0);
+            fluencyScore = Math.round(parseFloat(fluencyScore) || 0);
+            accuracyScore = Math.round(parseFloat(accuracyScore) || 0);
+            comprehensionScore = Math.round(parseFloat(comprehensionScore) || 0);
+
+            console.log('Final extracted scores:', {
+                overall: overallScore,
+                pronunciation: pronunciationScore,
+                fluency: fluencyScore,
+                accuracy: accuracyScore,
+                comprehension: comprehensionScore
+            }); // Debug log
+
+            // Update UI with extracted scores
             document.getElementById('overallScore').textContent = overallScore + '%';
+            updateScoreCard('pronunciation', pronunciationScore);
+            updateScoreCard('fluency', fluencyScore);
+            updateScoreCard('accuracy', accuracyScore);
+            updateScoreCard('comprehension', comprehensionScore);
 
-            // Show individual scores
-            updateScoreCard('pronunciation', results.pronunciation_score || 0);
-            updateScoreCard('fluency', results.fluency_score || 0);
-            updateScoreCard('accuracy', results.accuracy_score || 0);
-            updateScoreCard('comprehension', results.comprehension_score || 0);
+            // Show feedback with fallback
+            const feedbackElement = document.getElementById('feedbackText');
+            if (feedbackElement) {
+                feedbackElement.textContent = assessmentData.feedback || assessmentData.feedback_text || 'أداء جيد! استمر في التدريب لتحسين مهاراتك في القراءة.';
+            }
 
-            // Show feedback
-            document.getElementById('feedbackText').textContent =
-                results.feedback_text || 'أداء جيد! استمر في التدريب لتحسين مهاراتك في القراءة.';
-
-            // Show errors if any
-            displayErrors(results.errors_detected || []);
+            // Show errors if any - handle both possible property names
+            const errors = assessmentData.errors || assessmentData.errors_detected || [];
+            displayErrors(errors);
 
             // Show results section
             resultsSection.style.display = 'block';
@@ -645,9 +1291,35 @@
         }
 
         function updateScoreCard(type, score) {
-            const scoreValue = Math.round(score);
-            document.getElementById(type + 'Score').textContent = scoreValue + '%';
-            document.getElementById(type + 'Bar').style.width = scoreValue + '%';
+            console.log(`Updating ${type} score with value:`, score, 'type:', typeof score); // Debug log
+
+            // Handle both numeric and string values
+            let numericScore = 0;
+            if (typeof score === 'number') {
+                numericScore = score;
+            } else if (typeof score === 'string') {
+                numericScore = parseFloat(score) || 0;
+            }
+
+            const scoreValue = Math.round(numericScore);
+            console.log(`Rounded score for ${type}:`, scoreValue); // Debug log
+
+            const scoreElement = document.getElementById(type + 'Score');
+            const barElement = document.getElementById(type + 'Bar');
+
+            if (scoreElement) {
+                scoreElement.textContent = scoreValue + '%';
+                console.log(`Updated ${type}Score text to:`, scoreValue + '%');
+            } else {
+                console.error(`Score element not found for type: ${type}`);
+            }
+
+            if (barElement) {
+                barElement.style.width = scoreValue + '%';
+                console.log(`Updated ${type}Bar width to:`, scoreValue + '%');
+            } else {
+                console.error(`Bar element not found for type: ${type}`);
+            }
         }
 
         function displayErrors(errors) {
@@ -660,11 +1332,11 @@
 
             errorsList.innerHTML = errors.map(error => `
                 <div class="error-item">
-                    <strong>خطأ في الكلمة:</strong> ${error.expected_word || 'غير محدد'}<br>
-                    <strong>النطق الفعلي:</strong> ${error.actual_word || 'غير محدد'}<br>
-                    <strong>نوع الخطأ:</strong> ${getErrorTypeText(error.error_type)}<br>
+                    <strong>خطأ في الكلمة:</strong> ${error.expected || error.word || 'غير محدد'}<br>
+                    <strong>النطق الفعلي:</strong> ${error.actual || error.transcribed || 'غير محدد'}<br>
+                    <strong>نوع الخطأ:</strong> ${getErrorTypeText(error.type || error.error_type)}<br>
                     <strong>مستوى الخطأ:</strong> ${getSeverityText(error.severity)}
-                    ${error.feedback_message ? `<br><strong>التوجيه:</strong> ${error.feedback_message}` : ''}
+                    ${error.message || error.suggestion ? `<br><strong>التوجيه:</strong> ${error.message || error.suggestion}` : ''}
                 </div>
             `).join('');
         }
@@ -701,6 +1373,26 @@
 
             // Show success message
             showStatus('تم تحميل نص جديد - يمكنك بدء التقييم', 'success');
+        }
+
+        async function initializeMicrophone() {
+            try {
+                console.log('Requesting microphone access...');
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                console.log('Microphone access granted');
+                showStatus('تم الحصول على إذن استخدام الميكروفون', 'success');
+                return true;
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                showStatus('فشل في الحصول على إذن استخدام الميكروفون. يرجى السماح بالوصول للميكروفون.', 'error');
+                return false;
+            }
         }
     </script>
 </body>
