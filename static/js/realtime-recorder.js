@@ -163,7 +163,10 @@ class RealTimeRecorder {
         this.resetRecordingUI();
         this.showNotification(data.message, 'success');
         
-        if (data.result && data.result.scores) {
+        // Call the window function if it exists (for custom handling)
+        if (typeof window.onAssessmentComplete === 'function') {
+            window.onAssessmentComplete(data.result);
+        } else if (data.result && data.result.scores) {
             this.displayAssessmentResults(data.result);
         }
     }
