@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📝 معلومات الطالب - تقييم القراءة العربية</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Arial Unicode MS', 'Tahoma', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            direction: rtl;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #3498db;
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.2);
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ecf0f1;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .grade-info {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .difficulty-badges {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge.easy { background: #d4edda; color: #155724; }
+        .badge.medium { background: #fff3cd; color: #856404; }
+        .badge.hard { background: #f8d7da; color: #721c24; }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 معلومات الطالب</h1>
+            <p>أدخل بياناتك لبدء تقييم القراءة العربية</p>
+        </div>
+
+        <div id="error-message" class="error"></div>
+        <div id="success-message" class="success"></div>
+
+        <form id="studentForm">
+            <div class="form-group">
+                <label for="studentName">👤 اسم الطالب</label>
+                <input type="text" id="studentName" name="name" required
+                       placeholder="أدخل اسمك الكامل">
+            </div>
+
+            <div class="form-group">
+                <label for="studentEmail">📧 البريد الإلكتروني</label>
+                <input type="email" id="studentEmail" name="email" required
+                       placeholder="student@example.com">
+            </div>
+
+            <div class="form-group">
+                <label for="gradeLevel">🎓 المستوى الدراسي</label>
+                <select id="gradeLevel" name="grade_level" required>
+                    <option value="">اختر المستوى الدراسي</option>
+                    <option value="1">الصف الأول الابتدائي</option>
+                    <option value="2">الصف الثاني الابتدائي</option>
+                    <option value="3">الصف الثالث الابتدائي</option>
+                    <option value="4">الصف الرابع الابتدائي</option>
+                    <option value="5">الصف الخامس الابتدائي</option>
+                    <option value="6">الصف السادس الابتدائي</option>
+                </select>
+                <div class="grade-info">
+                    💡 اختر المستوى الدراسي المناسب لك لتحصل على نصوص مناسبة لمستواك
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="difficultyLevel">⚡ مستوى الصعوبة</label>
+                <select id="difficultyLevel" name="difficulty_level" required>
+                    <option value="">اختر مستوى الصعوبة</option>
+                    <option value="easy">سهل 🟢</option>
+                    <option value="medium">متوسط 🟡</option>
+                    <option value="hard">صعب 🔴</option>
+                </select>
+                <div class="difficulty-badges">
+                    <span class="badge easy">سهل - نصوص بسيطة</span>
+                    <span class="badge medium">متوسط - نصوص متوسطة</span>
+                    <span class="badge hard">صعب - نصوص متقدمة</span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary" id="submitBtn">
+                🚀 بدء التقييم
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>جاري تسجيل البيانات...</p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('studentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+
+            // Hide previous messages
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            // Get form data
+            const formData = new FormData(this);
+            const studentData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                grade_level: parseInt(formData.get('grade_level')),
+                difficulty_level: formData.get('difficulty_level')
+            };
+
+            // Validate form
+            if (!studentData.name || !studentData.email || !studentData.grade_level || !studentData.difficulty_level) {
+                showError('يرجى ملء جميع الحقول المطلوبة');
+                return;
+            }
+
+            // Show loading
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'جاري التسجيل...';
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/students', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(studentData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Store student data in localStorage
+                    localStorage.setItem('currentStudent', JSON.stringify({
+                        id: result.student_id,
+                        name: studentData.name,
+                        grade_level: studentData.grade_level,
+                        difficulty_level: studentData.difficulty_level
+                    }));
+
+                    showSuccess('تم تسجيل البيانات بنجاح! سيتم توجيهك لصفحة التقييم...');
+
+                    // Redirect to evaluation page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/evaluation';
+                    }, 2000);
+
+                } else {
+                    if (result.message.includes('already exists')) {
+                        // Student exists, just store the ID and redirect
+                        localStorage.setItem('currentStudent', JSON.stringify({
+                            id: result.student_id,
+                            name: studentData.name,
+                            grade_level: studentData.grade_level,
+                            difficulty_level: studentData.difficulty_level
+                        }));
+
+                        showSuccess('مرحباً بك مرة أخرى! سيتم توجيهك لصفحة التقييم...');
+
+                        setTimeout(() => {
+                            window.location.href = '/evaluation';
+                        }, 2000);
+                    } else {
+                        showError(result.message || 'حدث خطأ في تسجيل البيانات');
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError('حدث خطأ في الاتصال بالخادم');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 بدء التقييم';
+                loading.style.display = 'none';
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            errorDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            successDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Add some interactivity to form fields
+        document.querySelectorAll('input, select').forEach(field => {
+            field.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'translateY(-2px)';
+            });
+
+            field.addEventListener('blur', function() {
+                this.parentElement.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
+</body>
+</html>

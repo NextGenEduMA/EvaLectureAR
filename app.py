@@ -68,8 +68,13 @@ def allowed_file(filename):
 
 @app.route('/')
 def index():
-    """Serve the simplified Arabic interface"""
-    return render_template('simple_test.html')
+    """Serve the student registration page"""
+    return render_template('student_registration.html')
+
+@app.route('/evaluation')
+def evaluation_page():
+    """Serve the evaluation page"""
+    return render_template('evaluation.html')
 
 @app.route('/original')
 def original_interface():
@@ -105,23 +110,23 @@ def create_student():
     """Create a new student profile"""
     try:
         data = request.get_json()
-        
+
         if not data or 'name' not in data or 'email' not in data:
             return jsonify({
                 'success': False,
                 'message': 'Name and email are required'
             }), 400
-        
+
         result = learning_system.create_student_profile(
             name=data['name'],
             email=data['email'],
             grade_level=data.get('grade_level', 1),
             difficulty_level=data.get('difficulty_level', 'easy')
         )
-        
+
         status_code = 201 if result['success'] else 400
         return jsonify(result), status_code
-        
+
     except Exception as e:
         logger.error(f"Error creating student: {e}")
         return jsonify({
@@ -135,7 +140,7 @@ def get_student(student_id):
     try:
         result = learning_system.get_student_profile(student_id)
         return jsonify(result), 200 if result['success'] else 404
-        
+
     except Exception as e:
         logger.error(f"Error getting student: {e}")
         return jsonify({
@@ -149,12 +154,12 @@ def get_recommendations(student_id):
     try:
         limit = request.args.get('limit', 5, type=int)
         recommendations = learning_system.get_recommended_texts(student_id, limit)
-        
+
         return jsonify({
             'success': True,
             'recommendations': recommendations
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting recommendations: {e}")
         return jsonify({
@@ -167,13 +172,13 @@ def create_text():
     """Create a new text for assessment"""
     try:
         data = request.get_json()
-        
+
         if not data or 'title' not in data or 'content' not in data:
             return jsonify({
                 'success': False,
                 'message': 'Title and content are required'
             }), 400
-        
+
         # Create new text
         text = Text(
             title=data['title'],
@@ -184,10 +189,10 @@ def create_text():
             category=data.get('category', 'عام'),
             word_count=len(data['content'].split())
         )
-        
+
         db.session.add(text)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Text created successfully',
@@ -201,7 +206,7 @@ def create_text():
                 'word_count': text.word_count
             }
         }), 201
-        
+
     except Exception as e:
         logger.error(f"Error creating text: {e}")
         db.session.rollback()
@@ -216,16 +221,16 @@ def get_texts():
     try:
         difficulty = request.args.get('difficulty')
         category = request.args.get('category')
-        
+
         query = Text.query
-        
+
         if difficulty:
             query = query.filter_by(difficulty_level=difficulty)
         if category:
             query = query.filter_by(category=category)
-        
+
         texts = query.all()
-        
+
         return jsonify({
             'success': True,
             'texts': [{
@@ -238,9 +243,77 @@ def get_texts():
                 'created_at': text.created_at.isoformat()
             } for text in texts]
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting texts: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Internal server error'
+        }), 500
+
+@app.route('/api/texts/random', methods=['GET'])
+def get_random_text():
+    """Get a random text based on student's grade level and difficulty"""
+    try:
+        grade_level = request.args.get('grade_level', 1, type=int)
+        difficulty_level = request.args.get('difficulty_level', 'easy')
+
+        # Try to find a matching text from database
+        text = Text.query.filter_by(
+            grade_level=grade_level,
+            difficulty_level=difficulty_level
+        ).first()
+
+        if text:
+            return jsonify({
+                'success': True,
+                'text': {
+                    'id': text.id,
+                    'title': text.title,
+                    'content': text.content,
+                    'content_with_diacritics': text.content_with_diacritics,
+                    'difficulty_level': text.difficulty_level,
+                    'category': text.category
+                }
+            })
+        else:
+            # If no text found, create a demo text based on grade level
+            demo_texts = {
+                1: {
+                    'easy': 'هَذَا بَيْتٌ جَمِيلٌ. فِي الْبَيْتِ أُسْرَةٌ سَعِيدَةٌ. الْأَبُ يَعْمَلُ فِي الْمَكْتَبِ. الْأُمُّ تَطْبُخُ الطَّعَامَ.',
+                    'medium': 'كَانَ يَا مَا كَانَ فِي قَدِيمِ الزَّمَانِ وَلَدٌ صَغِيرٌ يُحِبُّ الْقِرَاءَةَ. كُلَّ يَوْمٍ يَقْرَأُ كِتَابًا جَدِيدًا وَيَتَعَلَّمُ أَشْيَاءَ مُفِيدَةً.',
+                    'hard': 'الْعِلْمُ نُورٌ يُضِيءُ طَرِيقَ الْحَيَاةِ. مَنْ طَلَبَ الْعِلْمَ مِنَ الْمَهْدِ إِلَى اللَّحْدِ وَجَدَ السَّعَادَةَ وَالنَّجَاحَ فِي دُنْيَاهُ وَآخِرَتِهِ.'
+                },
+                2: {
+                    'easy': 'فِي الْحَدِيقَةِ أَزْهَارٌ جَمِيلَةٌ وَأَشْجَارٌ خَضْرَاءُ. الطُّيُورُ تُغَرِّدُ فِي الصَّبَاحِ. الشَّمْسُ تُشْرِقُ كُلَّ يَوْمٍ.',
+                    'medium': 'يُحِبُّ أَحْمَدُ الذَّهَابَ إِلَى الْمَدْرَسَةِ. يَلْعَبُ مَعَ أَصْدِقَائِهِ فِي الْفُسْحَةِ وَيَدْرُسُ بِجِدٍّ فِي الْفَصْلِ. مُعَلِّمُهُ يُحِبُّهُ كَثِيرًا.',
+                    'hard': 'الصَّدَاقَةُ كَنْزٌ ثَمِينٌ لَا يُقَدَّرُ بِثَمَنٍ. الصَّدِيقُ الْوَفِيُّ يَقِفُ بِجَانِبِكَ فِي السَّرَّاءِ وَالضَّرَّاءِ وَيُسَاعِدُكَ فِي الْمُلِمَّاتِ.'
+                },
+                3: {
+                    'easy': 'الْمَاءُ مُهِمٌّ لِلْحَيَاةِ. نَشْرَبُ الْمَاءَ كُلَّ يَوْمٍ. النَّبَاتَاتُ تَحْتَاجُ إِلَى الْمَاءِ لِتَنْمُوَ. يَجِبُ أَنْ نُحَافِظَ عَلَى الْمَاءِ.',
+                    'medium': 'فِي فَصْلِ الرَّبِيعِ تَتَفَتَّحُ الْأَزْهَارُ وَتَخْضَرُّ الْأَشْجَارُ. الطَّقْسُ يَصْبِحُ مُعْتَدِلًا وَالنَّاسُ يَخْرُجُونَ لِلتَّنَزُّهِ فِي الْحَدَائِقِ.',
+                    'hard': 'الْقِرَاءَةُ غِذَاءُ الْعَقْلِ وَالرُّوحِ. تُوَسِّعُ آفَاقَنَا وَتُنَمِّي مَعْرِفَتَنَا. مَنْ يَقْرَأُ كَثِيرًا يَكْتَسِبُ ثَقَافَةً وَاسِعَةً وَيُصْبِحُ أَكْثَرَ حِكْمَةً.'
+                }
+            }
+
+            # Get appropriate demo text
+            grade_texts = demo_texts.get(grade_level, demo_texts[1])
+            demo_content = grade_texts.get(difficulty_level, grade_texts['easy'])
+
+            return jsonify({
+                'success': True,
+                'text': {
+                    'id': 'demo',
+                    'title': f'نص تجريبي - الصف {grade_level}',
+                    'content': demo_content,
+                    'content_with_diacritics': demo_content,
+                    'difficulty_level': difficulty_level,
+                    'category': 'تجريبي'
+                }
+            })
+
+    except Exception as e:
+        logger.error(f"Error getting random text: {e}")
         return jsonify({
             'success': False,
             'message': 'Internal server error'
@@ -263,19 +336,19 @@ def generate_arabic_text():
         grade_level = data.get('grade_level', 1)
         difficulty_level = data.get('difficulty_level', 'easy')
         topic = data.get('topic', 'عام')
-        
+
         # Use Gemini to generate appropriate Arabic text
         import google.generativeai as genai
-        
+
         api_key = os.getenv('GOOGLE_API_KEY')
         if not api_key:
             return jsonify({
                 'success': False,
                 'message': 'Google API key not configured'
             }), 500
-        
+
         genai.configure(api_key=api_key)
-        
+
         # List available models first
         models = genai.list_models()
         gemini_model = None
@@ -283,12 +356,12 @@ def generate_arabic_text():
             if 'gemini' in model.name.lower():
                 gemini_model = model.name
                 break
-        
+
         if not gemini_model:
             # Fallback text if no model is available
             generated_text = get_fallback_text(grade_level, difficulty_level)
             text_with_diacritics = add_diacritics_to_text(generated_text)
-            
+
             # Save to database
             text_record = Text(
                 title=f"نص تجريبي - الصف {grade_level}",
@@ -299,10 +372,10 @@ def generate_arabic_text():
                 category=topic,
                 word_count=len(generated_text.split())
             )
-            
+
             db.session.add(text_record)
             db.session.commit()
-            
+
             return jsonify({
                 'success': True,
                 'text': {
@@ -315,45 +388,45 @@ def generate_arabic_text():
                     'word_count': text_record.word_count
                 }
             })
-        
+
         model = genai.GenerativeModel(gemini_model)
-        
+
         # Create prompt based on grade level and difficulty
         difficulty_map = {
             'easy': 'سهل جداً',
-            'medium': 'متوسط', 
+            'medium': 'متوسط',
             'hard': 'صعب'
         }
-        
+
         prompt = f"""
         اكتب نصاً عربياً مناسباً للأطفال في الصف {grade_level} الابتدائي.
         مستوى الصعوبة: {difficulty_map.get(difficulty_level, 'سهل')}
         الموضوع: {topic}
-        
+
         المتطلبات:
         - النص يجب أن يكون من 3-5 جمل فقط
         - استخدم كلمات بسيطة ومناسبة للعمر
         - اجعل النص تعليمياً وممتعاً
         - تجنب الكلمات الصعبة
         - اكتب النص بدون تشكيل أولاً
-        
+
         أعطني النص فقط بدون أي تفسير إضافي.
         """
-        
+
         response = model.generate_content(prompt)
         generated_text = response.text.strip()
-        
+
         # Generate version with diacritics
         diacritics_prompt = f"""
         أضف التشكيل الكامل (الحركات) للنص العربي التالي:
         {generated_text}
-        
+
         أعطني النص مع التشكيل فقط بدون أي تفسير.
         """
-        
+
         diacritics_response = model.generate_content(diacritics_prompt)
         text_with_diacritics = diacritics_response.text.strip()
-        
+
         # Save to database
         text_record = Text(
             title=f"نص مولد - الصف {grade_level}",
@@ -364,10 +437,10 @@ def generate_arabic_text():
             category=topic,
             word_count=len(generated_text.split())
         )
-        
+
         db.session.add(text_record)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'text': {
@@ -380,13 +453,13 @@ def generate_arabic_text():
                 'word_count': text_record.word_count
             }
         })
-        
+
     except Exception as e:
         logger.error(f"Error generating Arabic text: {e}")
         # Return fallback text on error
         generated_text = get_fallback_text(grade_level, difficulty_level)
         text_with_diacritics = add_diacritics_to_text(generated_text)
-        
+
         # Save fallback text
         text_record = Text(
             title=f"نص تجريبي - الصف {grade_level}",
@@ -397,10 +470,10 @@ def generate_arabic_text():
             category=topic,
             word_count=len(generated_text.split())
         )
-        
+
         db.session.add(text_record)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'text': {
@@ -428,7 +501,7 @@ def get_fallback_text(grade_level: int, difficulty_level: str) -> str:
             'hard': 'في الغابة الجميلة، عاش أسد شجاع. كان يحمي الحيوانات الصغيرة. ساعد كل من يحتاج المساعدة.'
         }
     }
-    
+
     # Default to grade 1 if grade level not found
     grade_texts = texts.get(grade_level, texts[1])
     # Default to 'easy' if difficulty not found
@@ -460,13 +533,13 @@ def add_diacritics_to_text(text: str) -> str:
         'أصدقاءه': 'أَصْدِقَاءَهُ',
         'الفصل': 'الْفَصْلِ'
     }
-    
+
     words = text.split()
     diacritized_words = []
-    
+
     for word in words:
         diacritized_words.append(diacritics_map.get(word, word))
-    
+
     return ' '.join(diacritized_words)
 
 @app.route('/api/text-to-speech', methods=['POST'])
@@ -475,42 +548,42 @@ def text_to_speech():
     try:
         data = request.get_json()
         text = data.get('text', '')
-        
+
         if not text:
             return jsonify({
                 'success': False,
                 'message': 'النص مطلوب'
             }), 400
-        
+
         # Use Azure TTS to generate audio
         azure_key = os.getenv('AZURE_SPEECH_KEY')
         azure_region = os.getenv('AZURE_SPEECH_REGION')
-        
+
         if not azure_key or not azure_region:
             return jsonify({
                 'success': False,
                 'message': 'Azure Speech Services not configured'
             }), 500
-        
+
         import azure.cognitiveservices.speech as speechsdk
-        
+
         # Configure Azure Speech
         speech_config = speechsdk.SpeechConfig(subscription=azure_key, region=azure_region)
         speech_config.speech_synthesis_voice_name = "ar-SA-ZariyahNeural"
-        
+
         # Create temporary file for audio
         temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
         audio_config = speechsdk.audio.AudioOutputConfig(filename=temp_file.name)
-        
+
         # Create synthesizer
         synthesizer = speechsdk.SpeechSynthesizer(
             speech_config=speech_config,
             audio_config=audio_config
         )
-        
+
         # Generate speech
         result = synthesizer.speak_text_async(text).get()
-        
+
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
             # Return audio file
             return send_file(temp_file.name, as_attachment=True, download_name='arabic_text.wav')
@@ -519,7 +592,7 @@ def text_to_speech():
                 'success': False,
                 'message': 'فشل في توليد الصوت'
             }), 500
-            
+
     except Exception as e:
         logger.error(f"Error in text-to-speech: {e}")
         return jsonify({
@@ -534,7 +607,7 @@ def get_student_progress(student_id):
         days = request.args.get('days', 30, type=int)
         result = learning_system.generate_progress_report(student_id, days)
         return jsonify(result), 200 if result['success'] else 404
-        
+
     except Exception as e:
         logger.error(f"Error getting student progress: {e}")
         return jsonify({
@@ -556,7 +629,7 @@ def quick_test():
                 difficulty_level='easy'
             )
             db.session.add(student)
-        
+
         text = Text.query.filter_by(title='نص عربي تجريبي').first()
         if not text:
             text = Text(
@@ -569,9 +642,9 @@ def quick_test():
                 word_count=8
             )
             db.session.add(text)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Test data created',
@@ -583,7 +656,7 @@ def quick_test():
                 'get_recommendations': f'GET /api/students/{student.id}/recommendations'
             }
         })
-        
+
     except Exception as e:
         logger.error(f"Error in quick test: {e}")
         return jsonify({
@@ -613,15 +686,15 @@ def handle_start_recording(data):
         session_id = request.sid  # Use socket ID as session ID
         student_id = data.get('student_id')
         text_id = data.get('text_id')
-        
+
         if not student_id or not text_id:
             emit('recording_error', {
                 'message': 'يرجى تحديد الطالب والنص'
             })
             return
-        
+
         result = realtime_processor.start_session(session_id, student_id, text_id)
-        
+
         if result['success']:
             emit('recording_started', {
                 'message': result['message'],
@@ -631,7 +704,7 @@ def handle_start_recording(data):
             emit('recording_error', {
                 'message': result['message']
             })
-            
+
     except Exception as e:
         logger.error(f"Error starting recording: {e}")
         emit('recording_error', {
@@ -644,18 +717,18 @@ def handle_audio_chunk(data):
     try:
         session_id = request.sid
         audio_data = data.get('audio')
-        
+
         if not audio_data:
             return
-        
+
         result = realtime_processor.process_audio_chunk(session_id, audio_data)
-        
+
         if result['success']:
             # Send acknowledgment
             emit('chunk_processed', {
                 'chunk_count': result['chunk_received']
             })
-            
+
             # Send real-time feedback if available
             if 'realtime_feedback' in result:
                 emit('realtime_feedback', result['realtime_feedback'])
@@ -663,7 +736,7 @@ def handle_audio_chunk(data):
             emit('processing_error', {
                 'message': result['message']
             })
-            
+
     except Exception as e:
         logger.error(f"Error processing audio chunk: {e}")
         emit('processing_error', {
@@ -675,14 +748,14 @@ def handle_stop_recording():
     """Stop recording and process final assessment"""
     try:
         session_id = request.sid
-        
+
         # Notify client that processing has started
         emit('processing_started', {
             'message': 'جاري معالجة التسجيل وإنشاء التقييم...'
         })
-        
+
         result = realtime_processor.finish_session(session_id)
-        
+
         if result['success']:
             emit('assessment_complete', {
                 'message': result['message'],
@@ -693,7 +766,7 @@ def handle_stop_recording():
             emit('assessment_error', {
                 'message': result['message']
             })
-            
+
     except Exception as e:
         logger.error(f"Error stopping recording: {e}")
         emit('assessment_error', {
@@ -717,6 +790,6 @@ if __name__ == '__main__':
         logger.info("  - start_recording (begin real-time recording)")
         logger.info("  - audio_chunk (stream audio data)")
         logger.info("  - stop_recording (finish and assess)")
-    
+
     # Use SocketIO run instead of app.run for WebSocket support
     socketio.run(app, host='0.0.0.0', port=5001, debug=True)
