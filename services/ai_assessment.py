@@ -161,6 +161,11 @@ class ArabicAssessmentEngine:
         difficulty = student_data.get('difficulty_level', 'easy')
         student_name = student_data.get('name', 'الطالب')
 
+        # Check transcription quality
+        similarity = SequenceMatcher(None, 
+                                   self.normalize_arabic_text(text_data.get('content', '')).split(),
+                                   self.normalize_arabic_text(transcription_result.get('transcription', '')).split()).ratio() * 100
+
         prompt = f"""
 أنت معلم لغة عربية متخصص في تقييم القراءة للأطفال. يرجى تقييم أداء الطالب التالي:
 
@@ -175,13 +180,22 @@ class ArabicAssessmentEngine:
 النص الذي قرأه الطالب فعلياً:
 "{transcription_result.get('transcription', '')}"
 
-الأخطاء المكتشفة: {len(errors)} خطأ
-"""
+جودة التعرف على الكلام: {'ضعيفة - قد تكون هناك أخطاء في النظام وليس الطالب' if similarity < 30 else 'جيدة' if similarity > 60 else 'متوسطة'}
 
-        if errors:
+الأخطاء المكتشفة: {len(errors)} خطأ"""
+
+        if similarity < 30:
+            prompt += f"""
+
+ملاحظة مهمة: نسبة التطابق منخفضة جداً ({similarity:.1f}%)، مما يشير إلى احتمال وجود مشكلة في نظام التعرف على الكلام وليس في قراءة الطالب. 
+يرجى التركيز على التشجيع وتقديم نصائح عامة لتحسين وضوح النطق."""
+
+        if errors and len(errors) <= 10:
             prompt += "\nتفاصيل الأخطاء:\n"
             for i, error in enumerate(errors[:5]):  # Limit to 5 errors for brevity
                 prompt += f"- {error.get('type', 'خطأ')}: {error.get('message', '')}\n"
+        elif len(errors) > 10:
+            prompt += f"\nتم اكتشاف {len(errors)} خطأ - هذا العدد الكبير قد يشير إلى مشكلة في نظام التعرف على الكلام.\n"
 
         if pronunciation_details:
             prompt += f"\nدرجة النطق من Azure: {pronunciation_details.get('pronunciation_score', 'غير متوفر')}\n"
@@ -189,14 +203,13 @@ class ArabicAssessmentEngine:
         prompt += f"""
 يرجى تقديم تقييم شامل ومشجع مناسب لطفل في الصف {grade_level} يتضمن:
 
-1. نقاط القوة في الأداء
-2. المجالات التي تحتاج تحسين
-3. نصائح محددة وعملية للتحسين
-4. كلمات تشجيع إيجابية
-5. أهداف واضحة للتحسن
+1. كلمات تشجيع وإيجابية أولاً
+2. نقاط القوة في الأداء (حتى لو كانت المحاولة فقط)
+3. نصائح بسيطة ومحددة للتحسين
+4. تذكير بأن التدريب يحسن الأداء
 
 اجعل التقييم:
-- مشجعاً وإيجابياً
+- مشجعاً جداً وإيجابياً
 - مناسباً لعمر الطفل
 - محدداً وعملياً
 - باللغة العربية الواضحة
@@ -206,32 +219,43 @@ class ArabicAssessmentEngine:
 
     def _calculate_child_friendly_score(self, pronunciation: float, fluency: float,
                                       accuracy: float, student_data: Dict) -> float:
-        """Calculate overall score with child-friendly weighting"""
+        """Calculate overall score with child-friendly weighting and better handling for poor recognition"""
         grade_level = student_data.get('grade_level', 1)
         difficulty = student_data.get('difficulty_level', 'easy')
 
-        # Adjust weights based on grade level
+        # Adjust weights based on grade level - be more encouraging
         if grade_level <= 2:
-            # For younger children, emphasize accuracy over speed
-            weights = {'accuracy': 0.5, 'pronunciation': 0.3, 'fluency': 0.2}
+            # For younger children, emphasize effort over perfection
+            weights = {'accuracy': 0.4, 'pronunciation': 0.3, 'fluency': 0.3}
+            base_bonus = 20  # Give 20% bonus for young children
         elif grade_level <= 4:
             # Balanced approach for middle grades
             weights = {'accuracy': 0.4, 'pronunciation': 0.35, 'fluency': 0.25}
+            base_bonus = 15  # Give 15% bonus for middle grades
         else:
-            # For older children, include fluency more heavily
+            # For older children, more balanced but still encouraging
             weights = {'accuracy': 0.35, 'pronunciation': 0.35, 'fluency': 0.3}
+            base_bonus = 10  # Give 10% bonus for older children
 
-        # Apply difficulty bonus/penalty
-        difficulty_modifier = {'easy': 1.0, 'medium': 1.05, 'hard': 1.1}
+        # Apply difficulty bonus/penalty (reduced penalties)
+        difficulty_modifier = {'easy': 1.0, 'medium': 1.02, 'hard': 1.05}
         modifier = difficulty_modifier.get(difficulty, 1.0)
 
+        # Calculate weighted score
         overall = (
             accuracy * weights['accuracy'] +
             pronunciation * weights['pronunciation'] +
             fluency * weights['fluency']
         ) * modifier
 
-        return min(100, max(0, overall))
+        # Add base bonus for attempting the reading
+        overall += base_bonus
+
+        # Ensure minimum encouraging score
+        min_score = 25 if grade_level <= 2 else 20 if grade_level <= 4 else 15
+        overall = max(min_score, overall)
+
+        return min(100, overall)
 
     def _format_child_friendly_feedback(self, ai_feedback: str, student_data: Dict) -> str:
         """Format AI feedback to be child-friendly"""
@@ -499,7 +523,7 @@ class ArabicAssessmentEngine:
 
     def calculate_accuracy_score(self, original_text: str, transcribed_text: str,
                                errors: List[Dict]) -> Dict:
-        """Calculate reading accuracy score"""
+        """Calculate reading accuracy score with improved handling for poor transcriptions"""
         try:
             orig_words = self.normalize_arabic_text(original_text).split()
             trans_words = self.normalize_arabic_text(transcribed_text).split()
@@ -511,6 +535,28 @@ class ArabicAssessmentEngine:
             # Calculate text similarity using SequenceMatcher
             from difflib import SequenceMatcher
             similarity = SequenceMatcher(None, orig_words, trans_words).ratio() * 100
+
+            # If similarity is very low (< 30%), the speech recognition likely failed
+            # In this case, be more lenient with scoring
+            if similarity < 30:
+                logger.warning(f"Very low similarity ({similarity:.1f}%) - possible speech recognition error")
+                # Give partial credit for attempted reading
+                base_score = 40  # Base score for attempting to read
+                return {
+                    'accuracy_score': base_score,
+                    'similarity_score': round(similarity, 2),
+                    'error_rate': round((len(errors) / total_words) * 100, 2),
+                    'total_words': total_words,
+                    'total_errors': len(errors),
+                    'error_breakdown': {
+                        'mispronunciation': len(errors),
+                        'omission': 0,
+                        'insertion': 0,
+                        'missing_diacritics': 0,
+                        'pronunciation_accuracy': 0
+                    },
+                    'transcription_quality': 'poor'
+                }
 
             # Count different types of errors
             error_counts = {
@@ -526,14 +572,13 @@ class ArabicAssessmentEngine:
                 if error_type in error_counts:
                     error_counts[error_type] += 1
 
-            # Calculate weighted error score
-            # Different error types have different weights
+            # Calculate weighted error score with more lenient weights
             error_weights = {
-                'mispronunciation': 1.0,
-                'omission': 1.5,
-                'insertion': 0.5,
-                'missing_diacritics': 0.3,
-                'pronunciation_accuracy': 0.8
+                'mispronunciation': 0.7,  # Reduced from 1.0
+                'omission': 1.0,          # Reduced from 1.5
+                'insertion': 0.3,         # Reduced from 0.5
+                'missing_diacritics': 0.2, # Reduced from 0.3
+                'pronunciation_accuracy': 0.5  # Reduced from 0.8
             }
 
             weighted_errors = sum(
@@ -541,9 +586,9 @@ class ArabicAssessmentEngine:
                 for error_type in error_counts
             )
 
-            # Calculate accuracy score (0-100) - use similarity as base, adjust for errors
-            error_penalty = (weighted_errors / total_words) * 100
-            accuracy_score = max(0, similarity - error_penalty)
+            # More lenient error penalty calculation
+            error_penalty = min(60, (weighted_errors / total_words) * 80)  # Cap penalty at 60%
+            accuracy_score = max(20, similarity - error_penalty)  # Minimum 20% for attempt
 
             # If we have no errors but low similarity, use similarity score
             if len(errors) == 0 and similarity > accuracy_score:
@@ -557,7 +602,8 @@ class ArabicAssessmentEngine:
                 'error_rate': round(error_rate, 2),
                 'total_words': total_words,
                 'total_errors': len(errors),
-                'error_breakdown': error_counts
+                'error_breakdown': error_counts,
+                'transcription_quality': 'good' if similarity > 60 else 'fair' if similarity > 30 else 'poor'
             }
 
         except Exception as e:
@@ -803,63 +849,91 @@ class ArabicAssessmentEngine:
             orig_words = orig_normalized.split()
             trans_words = trans_normalized.split()
 
-            # Use pronunciation details if available
+            # Use pronunciation details if available (Azure Speech Services)
             if pronunciation_details and not pronunciation_details.get('error'):
                 word_details = pronunciation_details.get('word_details', [])
 
                 for word_detail in word_details:
                     accuracy_score = word_detail.get('accuracy_score', 0)
                     word = word_detail.get('word', '')
+                    error_type = word_detail.get('error_type', '')
 
-                    if accuracy_score < 60:  # Poor pronunciation
+                    # Only flag as error if accuracy is very low AND error type is significant
+                    if accuracy_score < 40 and error_type in ['Omission', 'Mispronunciation']:
                         errors.append({
                             'type': 'mispronunciation',
-                            'severity': 'high' if accuracy_score < 40 else 'medium',
+                            'severity': 'high' if accuracy_score < 20 else 'medium',
+                            'word': word,
+                            'accuracy_score': accuracy_score,
+                            'message': f'نطق غير دقيق للكلمة: {word}',
+                            'suggestion': 'حاول النطق بوضوح أكبر'
+                        })
+                    elif accuracy_score < 60 and error_type == 'Omission':
+                        # Be more lenient with omissions as they might be recognition errors
+                        errors.append({
+                            'type': 'mispronunciation',
+                            'severity': 'medium',
                             'word': word,
                             'accuracy_score': accuracy_score,
                             'message': f'نطق غير دقيق للكلمة: {word}',
                             'suggestion': 'حاول النطق بوضوح أكبر'
                         })
 
-            # Compare word-by-word using sequence matching
-            from difflib import SequenceMatcher
-            matcher = SequenceMatcher(None, orig_words, trans_words)
+            # Check overall similarity first - if very low, limit detailed word comparison
+            # as it's likely a speech recognition issue rather than reading errors
+            overall_similarity = SequenceMatcher(None, orig_words, trans_words).ratio() * 100
+            
+            # Only do detailed word-by-word comparison if similarity is reasonable
+            if overall_similarity > 25:  # Only if some similarity exists
+                # Compare word-by-word using sequence matching
+                from difflib import SequenceMatcher
+                matcher = SequenceMatcher(None, orig_words, trans_words)
 
-            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-                if tag == 'delete':  # Missing words (omissions)
-                    for i in range(i1, i2):
-                        errors.append({
-                            'type': 'omission',
-                            'severity': 'high',
-                            'word': orig_words[i],
-                            'position': i,
-                            'message': f'تم حذف الكلمة: {orig_words[i]}',
-                            'suggestion': 'تأكد من قراءة جميع الكلمات'
-                        })
+                error_limit = min(10, len(orig_words))  # Limit errors to prevent overwhelming feedback
 
-                elif tag == 'insert':  # Extra words (insertions)
-                    for j in range(j1, j2):
-                        errors.append({
-                            'type': 'insertion',
-                            'severity': 'medium',
-                            'word': trans_words[j],
-                            'position': j,
-                            'message': f'تم إضافة كلمة غير موجودة: {trans_words[j]}',
-                            'suggestion': 'اقرأ النص فقط كما هو مكتوب'
-                        })
+                for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                    if len(errors) >= error_limit:  # Stop if we have too many errors already
+                        break
+                        
+                    if tag == 'delete' and len(errors) < error_limit - 2:  # Missing words (omissions)
+                        for i in range(i1, min(i2, i1 + 3)):  # Limit to 3 omissions per sequence
+                            if len(errors) < error_limit:
+                                errors.append({
+                                    'type': 'mispronunciation',  # Treat as mispronunciation instead of omission
+                                    'severity': 'high',
+                                    'expected': orig_words[i],
+                                    'actual': 'غير محدد',
+                                    'position': i,
+                                    'message': f'نطق خاطئ: قيل "غير محدد" بدلاً من "{orig_words[i]}"',
+                                    'suggestion': f'النطق الصحيح هو: {orig_words[i]}'
+                                })
 
-                elif tag == 'replace':  # Substituted words (mispronunciations)
-                    for i, j in zip(range(i1, i2), range(j1, j2)):
-                        if i < len(orig_words) and j < len(trans_words):
-                            errors.append({
-                                'type': 'mispronunciation',
-                                'severity': 'high',
-                                'expected': orig_words[i],
-                                'actual': trans_words[j],
-                                'position': i,
-                                'message': f'نطق خاطئ: قيل "{trans_words[j]}" بدلاً من "{orig_words[i]}"',
-                                'suggestion': f'النطق الصحيح هو: {orig_words[i]}'
-                            })
+                    elif tag == 'replace':  # Substituted words (mispronunciations)
+                        for i, j in zip(range(i1, min(i2, i1 + 3)), range(j1, min(j2, j1 + 3))):
+                            if len(errors) < error_limit and i < len(orig_words) and j < len(trans_words):
+                                errors.append({
+                                    'type': 'mispronunciation',
+                                    'severity': 'high',
+                                    'expected': orig_words[i],
+                                    'actual': trans_words[j],
+                                    'position': i,
+                                    'message': f'نطق خاطئ: قيل "{trans_words[j]}" بدلاً من "{orig_words[i]}"',
+                                    'suggestion': f'النطق الصحيح هو: {orig_words[i]}'
+                                })
+            else:
+                # Very low similarity - likely speech recognition issue
+                # Add only a few generic errors to acknowledge the issue without overwhelming
+                logger.warning(f"Very low similarity ({overall_similarity:.1f}%) in pronunciation error detection")
+                for i, word in enumerate(orig_words[:5]):  # Only first 5 words
+                    errors.append({
+                        'type': 'mispronunciation',
+                        'severity': 'medium',  # Lower severity for recognition issues
+                        'expected': word,
+                        'actual': 'غير واضح',
+                        'position': i,
+                        'message': f'لم يتم التعرف على النطق الصحيح للكلمة: {word}',
+                        'suggestion': f'حاول نطق الكلمة "{word}" بوضوح أكبر'
+                    })
 
             return errors
 
