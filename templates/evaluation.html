@@ -579,7 +579,7 @@
                     <span class="btn-text">⏹️ إيقاف التسجيل</span>
                 </button>
                 <button id="newTextBtn" class="btn btn-new-text">
-                    <span class="btn-text">🤖 نص جديد بالذكاء الاصطناعي</span>
+                    <span class="btn-text">نص جديد</span>
                 </button>
             </div>
         </div>
@@ -737,10 +737,10 @@
 
         async function loadRandomText() {
             try {
-                showStatus('جاري إنشاء نص تعليمي باستخدام الذكاء الاصطناعي...', 'info');
+                showStatus('جاري تحميل نص تعليمي...', 'info');
 
-                // Use the dedicated RAG-only endpoint
-                const response = await fetch('/api/texts/rag-only?' + new URLSearchParams({
+                // Use the random text endpoint
+                const response = await fetch('/api/texts/random?' + new URLSearchParams({
                     grade_level: currentStudent.grade_level,
                     difficulty_level: currentStudent.difficulty_level
                 }));
@@ -751,38 +751,28 @@
                 if (result.success && result.text) {
                     currentText = result.text;
 
-                    // Show different styling based on source
+                    // Show text with clean styling
                     let contentHTML = `<div style="color: #2c3e50; font-weight: 600;">${result.text.content}</div>`;
                     let statusMessage = '';
 
-                    if (result.rag_generated) {
-                        statusMessage = `✨ تم إنشاء النص باستخدام الذكاء الاصطناعي - الموضوع: ${result.text.category || 'تعليمي'}`;
-                        contentHTML += `<div style="margin-top: 10px; padding: 8px; background: #e8f5e8; border-left: 4px solid #27ae60; font-size: 12px; color: #27ae60;">
-                            🤖 نص مولد بالذكاء الاصطناعي | المصادر المستخدمة: ${result.sources_used || 0} | الثقة: ${result.confidence || 'عالية'}
-                        </div>`;
-                        showStatus(statusMessage, 'success');
-                    } else if (result.text.id === 'demo') {
+                    if (result.source === 'database') {
+                        statusMessage = `📚 ${result.text.title || 'نص تعليمي جديد'}`;
+                    } else {
                         statusMessage = '📝 نص تجريبي احتياطي';
                         contentHTML += `<div style="margin-top: 10px; padding: 8px; background: #fff3cd; border-left: 4px solid #ffc107; font-size: 12px; color: #856404;">
-                            ⚠️ نص احتياطي - فشل في توليد المحتوى بالذكاء الاصطناعي
+                            ⚠️ نص احتياطي - لا توجد نصوص في قاعدة البيانات
                         </div>`;
                         showStatus(statusMessage, 'warning');
-                    } else {
-                        statusMessage = '📚 نص من قاعدة البيانات';
-                        contentHTML += `<div style="margin-top: 10px; padding: 8px; background: #e3f2fd; border-left: 4px solid #2196f3; font-size: 12px; color: #1976d2;">
-                            💾 نص محفوظ من قاعدة البيانات
-                        </div>`;
-                        showStatus(statusMessage, 'info');
                     }
 
                     document.getElementById('textContainer').innerHTML = contentHTML;
                 } else {
-                    // Handle RAG generation errors more specifically
-                    let errorMessage = 'فشل في توليد النص';
+                    // Handle database errors
+                    let errorMessage = result.message || 'فشل في تحميل النص';
                     let fallbackContent = 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ. الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ. هَذَا نَصٌّ تَجْرِيبِيٌّ لِتَقْيِيمِ الْقِرَاءَةِ الْعَرَبِيَّةِ.';
 
-                    if (result.error_type === 'rag_error') {
-                        errorMessage = `⚠️ فشل في توليد النص بالذكاء الاصطناعي: ${result.message}`;
+                    if (result.suggestion && result.suggestion.includes('populate_texts.py')) {
+                        errorMessage = `⚠️ لا توجد نصوص في قاعدة البيانات للمستوى المطلوب. يرجى تشغيل populate_texts.py لإضافة النصوص.`;
                         showStatus(errorMessage, 'error');
                     } else {
                         errorMessage = 'لم يتم العثور على نص مناسب. جاري استخدام نص تجريبي...';

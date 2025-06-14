@@ -27,7 +27,7 @@ from services.speech_recognition import ArabicSpeechRecognizer
 from services.ai_assessment import ArabicAssessmentEngine
 from services.feedback_generation import ArabicFeedbackGenerator
 from services.learning_management import LearningManagementSystem
-from rag.rag_pipeline import RAGPipeline
+# RAG disabled for now - using database texts only
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -53,37 +53,18 @@ migrate = Migrate(app, db)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-from rag.rag_pipeline import RAGPipeline
-
 # Initialize services
 speech_recognizer = ArabicSpeechRecognizer()
 assessment_engine = ArabicAssessmentEngine()
 feedback_generator = ArabicFeedbackGenerator()
 learning_system = LearningManagementSystem()
 
-# Initialize RAG system - with proper error handling
-try:
-    # Initialize RAG with timeout handling
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+# Initialize real-time processor
+from services.realtime_processor import RealTimeAudioProcessor
+realtime_processor = RealTimeAudioProcessor(
+    speech_recognizer, assessment_engine, feedback_generator, learning_system)
 
-    def init_rag():
-        rag = RAGPipeline()
-        return rag
-
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(init_rag)
-        try:
-            rag_system = future.result(timeout=10)  # 10 second timeout for initialization
-            logger.info("RAG system initialized successfully")
-        except (TimeoutError, FutureTimeoutError):
-            logger.warning("RAG system initialization timed out, will initialize on demand")
-            rag_system = None
-        except Exception as e:
-            logger.warning(f"RAG system initialization failed: {e}, will initialize on demand")
-            rag_system = None
-except Exception as e:
-    logger.warning(f"Error setting up RAG system: {e}")
-    rag_system = None
+# RAG system disabled - using database texts for performance
 
 # Create upload directories
 UPLOAD_FOLDER = 'uploads'
@@ -284,179 +265,56 @@ def get_texts():
 
 @app.route('/api/texts/random', methods=['GET'])
 def get_random_text():
-    """Get a random text based on student's grade level and difficulty - Enhanced with RAG"""
+    """Get a random text based on student's grade level and difficulty - DATABASE ONLY"""
     try:
         grade_level = request.args.get('grade_level', 1, type=int)
         difficulty_level = request.args.get('difficulty_level', 'easy')
-        force_rag = request.args.get('force_rag', 'false').lower() == 'true'  # Default to database first
 
-        # Try database first (default behavior)
-        text = Text.query.filter_by(
+        logger.info(f"Fetching random text: grade={grade_level}, difficulty={difficulty_level}")
+
+        # Query database for matching texts
+        texts = Text.query.filter_by(
             grade_level=grade_level,
             difficulty_level=difficulty_level
-        ).first()
+        ).all()
 
-        if text and not force_rag:
+        if not texts:
+            # Try to find texts with just grade level if no difficulty match
+            texts = Text.query.filter_by(grade_level=grade_level).all()
+
+        if not texts:
             return jsonify({
-                'success': True,
-                'text': {
-                    'id': text.id,
-                    'title': text.title,
-                    'content': text.content,
-                    'content_with_diacritics': text.content_with_diacritics,
-                    'difficulty_level': text.difficulty_level,
-                    'category': text.category
-                },
-                'rag_generated': False
-            })
+                'success': False,
+                'message': 'لا توجد نصوص متاحة لهذا المستوى',
+                'suggestion': 'Run python populate_texts.py to generate texts'
+            }), 404
 
-        # Use RAG to generate new content (only if explicitly requested)
-        try:
-            # Use threading-based timeout instead of signal-based timeout
-            import threading
-            import time
-            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+        # Select random text
+        import random
+        selected_text = random.choice(texts)
 
-            def rag_generation_task():
-                from rag import RAGPipeline
-                from dotenv import load_dotenv
-                load_dotenv()  # Ensure environment variables are loaded
-
-                # Initialize RAG system
-                rag = RAGPipeline()
-                rag.initialize_system()
-                return rag
-
-            # Use ThreadPoolExecutor with timeout
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(rag_generation_task)
-                try:
-                    rag = future.result(timeout=30)  # 30 second timeout
-                except FutureTimeoutError:
-                    raise TimeoutError("RAG initialization timed out")
-
-                # Create appropriate prompts based on grade level and difficulty
-                difficulty_instructions = {
-                    'easy': 'استخدم كلمات بسيطة وجمل قصيرة',
-                    'medium': 'استخدم كلمات متوسطة وجمل معتدلة الطول',
-                    'hard': 'استخدم مفردات متقدمة وجمل معقدة'
-                }
-
-                # Grade-specific topics
-                grade_topics = {
-                    1: ['الأسرة', 'البيت', 'الألوان', 'الحيوانات', 'الطعام'],
-                    2: ['المدرسة', 'الأصدقاء', 'الألعاب', 'الطبيعة', 'النظافة'],
-                    3: ['القراءة', 'العلم', 'الرياضة', 'البيئة', 'الصحة'],
-                    4: ['التاريخ', 'الجغرافيا', 'الثقافة', 'الفنون', 'التكنولوجيا'],
-                    5: ['الأدب', 'العلوم', 'الاكتشافات', 'الحضارة', 'المستقبل']
-                }
-
-                # Select topic for this grade
-                import random
-                topics = grade_topics.get(grade_level, grade_topics[1])
-                selected_topic = random.choice(topics)
-
-                # Generate RAG-based content with timeout
-                def generate_rag_content():
-                    rag_prompt = f"""
-باستخدام المحتوى التعليمي المتاح، أنشئ نصاً تعليمياً مناسباً للصف {grade_level} عن موضوع "{selected_topic}".
-
-المتطلبات:
-- مستوى الصعوبة: {difficulty_level} ({difficulty_instructions[difficulty_level]})
-- الطول: 80-120 كلمة
-- يجب أن يكون النص تعليمياً ومفيداً
-- استخدم المحتوى من الكتاب كمرجع
-- اجعل النص مشوقاً ومناسباً للعمر
-
-أنشئ نصاً تعليمياً جميلاً ومفيداً:
-"""
-                    return rag.ask(rag_prompt)
-
-                # Execute RAG generation with timeout
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(generate_rag_content)
-                    response = future.result(timeout=60)  # 60 second timeout for generation
-
-                if response.answer and len(response.answer.strip()) > 50:
-                    # Successfully generated RAG content
-                    generated_text = response.answer.strip()
-
-                    # Create and save the generated text to database for future use
-                    new_text = Text(
-                        title=f"نص مولد - {selected_topic} (الصف {grade_level})",
-                        content=generated_text,
-                        content_with_diacritics=generated_text,
-                        grade_level=grade_level,
-                        difficulty_level=difficulty_level,
-                        category=selected_topic,
-                        word_count=len(generated_text.split())
-                    )
-
-                    db.session.add(new_text)
-                    db.session.commit()
-
-                    return jsonify({
-                        'success': True,
-                        'text': {
-                            'id': new_text.id,
-                            'title': new_text.title,
-                            'content': generated_text,
-                            'content_with_diacritics': generated_text,
-                            'difficulty_level': difficulty_level,
-                            'category': selected_topic
-                        },
-                        'rag_generated': True,
-                        'confidence': response.confidence,
-                        'sources_used': len(response.sources)
-                    })
-
-        except (TimeoutError, FutureTimeoutError) as timeout_error:
-            logger.warning(f"RAG generation timed out: {timeout_error}, falling back to demo text")
-
-        except Exception as rag_error:
-            logger.warning(f"RAG generation failed: {rag_error}, falling back to demo text")
-
-            # Fallback to demo text if RAG fails
-            # If no text found, create a demo text based on grade level
-            demo_texts = {
-                1: {
-                    'easy': 'هَذَا بَيْتٌ جَمِيلٌ. فِي الْبَيْتِ أُسْرَةٌ سَعِيدَةٌ. الْأَبُ يَعْمَلُ فِي الْمَكْتَبِ. الْأُمُّ تَطْبُخُ الطَّعَامَ.',
-                    'medium': 'كَانَ يَا مَا كَانَ فِي قَدِيمِ الزَّمَانِ وَلَدٌ صَغِيرٌ يُحِبُّ الْقِرَاءَةَ. كُلَّ يَوْمٍ يَقْرَأُ كِتَابًا جَدِيدًا وَيَتَعَلَّمُ أَشْيَاءَ مُفِيدَةً.',
-                    'hard': 'الْعِلْمُ نُورٌ يُضِيءُ طَرِيقَ الْحَيَاةِ. مَنْ طَلَبَ الْعِلْمَ مِنَ الْمَهْدِ إِلَى اللَّحْدِ وَجَدَ السَّعَادَةَ وَالنَّجَاحَ فِي دُنْيَاهُ وَآخِرَتِهِ.'
-                },
-                2: {
-                    'easy': 'فِي الْحَدِيقَةِ أَزْهَارٌ جَمِيلَةٌ وَأَشْجَارٌ خَضْرَاءُ. الطُّيُورُ تُغَرِّدُ فِي الصَّبَاحِ. الشَّمْسُ تُشْرِقُ كُلَّ يَوْمٍ.',
-                    'medium': 'يُحِبُّ أَحْمَدُ الذَّهَابَ إِلَى الْمَدْرَسَةِ. يَلْعَبُ مَعَ أَصْدِقَائِهِ فِي الْفُسْحَةِ وَيَدْرُسُ بِجِدٍّ فِي الْفَصْلِ. مُعَلِّمُهُ يُحِبُّهُ كَثِيرًا.',
-                    'hard': 'الصَّدَاقَةُ كَنْزٌ ثَمِينٌ لَا يُقَدَّرُ بِثَمَنٍ. الصَّدِيقُ الْوَفِيُّ يَقِفُ بِجَانِبِكَ فِي السَّرَّاءِ وَالضَّرَّاءِ وَيُسَاعِدُكَ فِي الْمُلِمَّاتِ.'
-                },
-                3: {
-                    'easy': 'الْمَاءُ مُهِمٌّ لِلْحَيَاةِ. نَشْرَبُ الْمَاءَ كُلَّ يَوْمٍ. النَّبَاتَاتُ تَحْتَاجُ إِلَى الْمَاءِ لِتَنْمُوَ. يَجِبُ أَنْ نُحَافِظَ عَلَى الْمَاءِ.',
-                    'medium': 'فِي فَصْلِ الرَّبِيعِ تَتَفَتَّحُ الْأَزْهَارُ وَتَخْضَرُّ الْأَشْجَارُ. الطَّقْسُ يَصْبِحُ مُعْتَدِلًا وَالنَّاسُ يَخْرُجُونَ لِلتَّنَزُّهِ فِي الْحَدَائِقِ.',
-                    'hard': 'الْقِرَاءَةُ غِذَاءُ الْعَقْلِ وَالرُّوحِ. تُوَسِّعُ آفَاقَنَا وَتُنَمِّي مَعْرِفَتَنَا. مَنْ يَقْرَأُ كَثِيرًا يَكْتَسِبُ ثَقَافَةً وَاسِعَةً وَيُصْبِحُ أَكْثَرَ حِكْمَةً.'
-                }
-            }
-
-            # Get appropriate demo text
-            grade_texts = demo_texts.get(grade_level, demo_texts[1])
-            demo_content = grade_texts.get(difficulty_level, grade_texts['easy'])
-
-            return jsonify({
-                'success': True,
-                'text': {
-                    'id': 'demo',
-                    'title': f'نص تجريبي - الصف {grade_level}',
-                    'content': demo_content,
-                    'content_with_diacritics': demo_content,
-                    'difficulty_level': difficulty_level,
-                    'category': 'تجريبي'
-                }
-            })
+        return jsonify({
+            'success': True,
+            'text': {
+                'id': selected_text.id,
+                'title': selected_text.title,
+                'content': selected_text.content,
+                'content_with_diacritics': selected_text.content_with_diacritics or selected_text.content,
+                'difficulty_level': selected_text.difficulty_level,
+                'category': selected_text.category,
+                'grade_level': selected_text.grade_level,
+                'word_count': selected_text.word_count
+            },
+            'source': 'database',
+            'available_count': len(texts),
+            'message': f'تم اختيار نص من {len(texts)} نص متاح'
+        })
 
     except Exception as e:
         logger.error(f"Error getting random text: {e}")
         return jsonify({
             'success': False,
-            'message': 'Internal server error'
+            'message': f'خطأ في جلب النص: {str(e)}'
         }), 500
 
 # Import and register assessment routes
@@ -465,324 +323,94 @@ from routes.assessment_routes import assessment_bp, init_services
 # Initialize services for assessment routes
 init_services(speech_recognizer, assessment_engine, feedback_generator, learning_system)
 
-# Import and register RAG routes
-from routes.rag_routes import rag_bp
+# RAG routes disabled for now to prevent hanging
+# from routes.rag_routes import rag_bp
 
 # Register blueprints
 app.register_blueprint(assessment_bp)
-app.register_blueprint(rag_bp)
-
-@app.route('/api/texts/rag-only', methods=['GET'])
-def get_rag_text_only():
-    """Get text generated ONLY using RAG system - no database fallback"""
-    try:
-        grade_level = request.args.get('grade_level', 1, type=int)
-        difficulty_level = request.args.get('difficulty_level', 'easy')
-        bypass_rag = request.args.get('bypass_rag', 'false').lower() == 'true'
-
-        logger.info(f"RAG-only request: grade_level={grade_level}, difficulty_level={difficulty_level}, bypass_rag={bypass_rag}")
-
-        # Quick bypass for testing
-        if bypass_rag:
-            logger.info("Bypassing RAG generation for testing")
-            demo_text = "هذا نص تجريبي بسيط. يمكن للطلاب قراءته لاختبار النظام. النص يحتوي على كلمات واضحة ومفهومة."
-            return jsonify({
-                'success': True,
-                'text': {
-                    'id': 999,
-                    'title': 'نص تجريبي',
-                    'content': demo_text,
-                    'content_with_diacritics': demo_text,
-                    'difficulty_level': difficulty_level,
-                    'category': 'تجريبي'
-                },
-                'rag_generated': False,
-                'confidence': 1.0,
-                'sources_used': 0,
-                'processing_time': 0.1
-            })
-
-        # Initialize RAG system with timeout
-        try:
-            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-
-            def rag_initialization_task():
-                from rag import RAGPipeline
-                from dotenv import load_dotenv
-                load_dotenv()
-                rag = RAGPipeline()
-                rag.initialize_system()
-                return rag
-
-            # Use ThreadPoolExecutor with timeout for initialization
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(rag_initialization_task)
-                rag = future.result(timeout=30)  # 30 second timeout for initialization
-
-            # Create difficulty instructions
-            difficulty_instructions = {
-                'easy': 'استخدم كلمات بسيطة وجمل قصيرة',
-                'medium': 'استخدم كلمات متوسطة وجمل معتدلة الطول',
-                'hard': 'استخدم مفردات متقدمة وجمل معقدة'
-            }
-
-            # Grade-specific topics
-            grade_topics = {
-                1: ['الأسرة', 'البيت', 'الألوان', 'الحيوانات', 'الطعام'],
-                2: ['المدرسة', 'الأصدقاء', 'الألعاب', 'الطبيعة', 'النظافة'],
-                3: ['القراءة', 'العلم', 'الرياضة', 'البيئة', 'الصحة'],
-                4: ['التاريخ', 'الجغرافيا', 'الثقافة', 'الفنون', 'التكنولوجيا'],
-                5: ['الأدب', 'العلوم', 'الاكتشافات', 'الحضارة', 'المستقبل']
-            }
-
-            # Select topic for this grade
-            import random
-            topics = grade_topics.get(grade_level, grade_topics[1])
-            selected_topic = random.choice(topics)
-
-            # Generate RAG-based content with timeout
-            def generate_rag_content():
-                rag_prompt = f"""
-باستخدام المحتوى التعليمي المتاح، أنشئ نصاً تعليمياً مناسباً للصف {grade_level} عن موضوع "{selected_topic}".
-
-المتطلبات:
-- مستوى الصعوبة: {difficulty_level} ({difficulty_instructions[difficulty_level]})
-- الطول: 80-120 كلمة
-- يجب أن يكون النص تعليمياً ومفيداً
-- استخدم المحتوى من الكتاب كمرجع
-- اجعل النص مشوقاً ومناسباً للعمر
-
-أنشئ نصاً تعليمياً جميلاً ومفيداً:
-"""
-                return rag.ask(rag_prompt)
-
-            logger.info("Generating RAG content...")
-
-            # Execute RAG generation with timeout
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(generate_rag_content)
-                response = future.result(timeout=60)  # 60 second timeout for generation
-
-            if response.answer and len(response.answer.strip()) > 50:
-                # Successfully generated RAG content
-                generated_text = response.answer.strip()
-
-                # Create and save the generated text to database for future use
-                new_text = Text(
-                    title=f"نص مولد - {selected_topic} (الصف {grade_level})",
-                    content=generated_text,
-                    content_with_diacritics=generated_text,
-                    grade_level=grade_level,
-                    difficulty_level=difficulty_level,
-                    category=selected_topic,
-                    word_count=len(generated_text.split())
-                )
-
-                db.session.add(new_text)
-                db.session.commit()
-
-                logger.info(f"RAG content generated successfully: {len(generated_text)} characters")
-
-                return jsonify({
-                    'success': True,
-                    'text': {
-                        'id': new_text.id,
-                        'title': new_text.title,
-                        'content': generated_text,
-                        'content_with_diacritics': generated_text,
-                        'difficulty_level': difficulty_level,
-                        'category': selected_topic
-                    },
-                    'rag_generated': True,
-                    'confidence': response.confidence,
-                    'sources_used': len(response.sources),
-                    'processing_time': response.processing_time
-                })
-            else:
-                logger.warning("RAG response was empty or too short")
-                raise Exception("RAG response was empty or too short")
-
-        except (TimeoutError, FutureTimeoutError) as timeout_error:
-            logger.error(f"RAG generation timed out: {timeout_error}")
-            return jsonify({
-                'success': False,
-                'message': f'RAG generation timed out after 60 seconds: {str(timeout_error)}',
-                'error_type': 'timeout_error'
-            }), 408
-
-        except Exception as rag_error:
-            logger.error(f"RAG generation failed: {rag_error}")
-            return jsonify({
-                'success': False,
-                'message': f'RAG generation failed: {str(rag_error)}',
-                'error_type': 'rag_error'
-            }), 500
-
-    except Exception as e:
-        logger.error(f"Error in RAG-only endpoint: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'Internal server error: {str(e)}'
-        }), 500
-
 @app.route('/api/generate-text', methods=['POST'])
 def generate_arabic_text():
-    """Generate Arabic text using AI based on grade level and difficulty"""
+    """Generate Arabic text - now redirects to database instead of AI generation"""
     try:
         data = request.get_json()
         grade_level = data.get('grade_level', 1)
         difficulty_level = data.get('difficulty_level', 'easy')
-        topic = data.get('topic', 'عام')
+        topic = data.get('topic', None)
 
-        # Use Gemini to generate appropriate Arabic text
-        import google.generativeai as genai
+        logger.info(f"Text generation request: grade={grade_level}, difficulty={difficulty_level}, topic={topic}")
 
-        api_key = os.getenv('GOOGLE_API_KEY')
-        if not api_key:
+        # Redirect to database-based text selection
+        # This is much faster and more reliable than RAG generation
+
+        # Validate parameters
+        if grade_level not in range(1, 7):
             return jsonify({
                 'success': False,
-                'message': 'Google API key not configured'
-            }), 500
+                'message': 'Grade level must be between 1 and 6'
+            }), 400
 
-        genai.configure(api_key=api_key)
-
-        # List available models first
-        models = genai.list_models()
-        gemini_model = None
-        for model in models:
-            if 'gemini' in model.name.lower():
-                gemini_model = model.name
-                break
-
-        if not gemini_model:
-            # Fallback text if no model is available
-            generated_text = get_fallback_text(grade_level, difficulty_level)
-            text_with_diacritics = add_diacritics_to_text(generated_text)
-
-            # Save to database
-            text_record = Text(
-                title=f"نص تجريبي - الصف {grade_level}",
-                content=generated_text,
-                content_with_diacritics=text_with_diacritics,
-                grade_level=grade_level,
-                difficulty_level=difficulty_level,
-                category=topic,
-                word_count=len(generated_text.split())
-            )
-
-            db.session.add(text_record)
-            db.session.commit()
-
+        if difficulty_level not in ['easy', 'medium', 'hard']:
             return jsonify({
-                'success': True,
-                'text': {
-                    'id': text_record.id,
-                    'title': text_record.title,
-                    'content': generated_text,
-                    'content_with_diacritics': text_with_diacritics,
-                    'grade_level': grade_level,
-                    'difficulty_level': difficulty_level,
-                    'word_count': text_record.word_count
-                }
-            })
+                'success': False,
+                'message': 'Difficulty must be easy, medium, or hard'
+            }), 400
 
-        model = genai.GenerativeModel(gemini_model)
-
-        # Create prompt based on grade level and difficulty
-        difficulty_map = {
-            'easy': 'سهل جداً',
-            'medium': 'متوسط',
-            'hard': 'صعب'
-        }
-
-        prompt = f"""
-        اكتب نصاً عربياً مناسباً للأطفال في الصف {grade_level} الابتدائي.
-        مستوى الصعوبة: {difficulty_map.get(difficulty_level, 'سهل')}
-        الموضوع: {topic}
-
-        المتطلبات:
-        - النص يجب أن يكون من 3-5 جمل فقط
-        - استخدم كلمات بسيطة ومناسبة للعمر
-        - اجعل النص تعليمياً وممتعاً
-        - تجنب الكلمات الصعبة
-        - اكتب النص بدون تشكيل أولاً
-
-        أعطني النص فقط بدون أي تفسير إضافي.
-        """
-
-        response = model.generate_content(prompt)
-        generated_text = response.text.strip()
-
-        # Generate version with diacritics
-        diacritics_prompt = f"""
-        أضف التشكيل الكامل (الحركات) للنص العربي التالي:
-        {generated_text}
-
-        أعطني النص مع التشكيل فقط بدون أي تفسير.
-        """
-
-        diacritics_response = model.generate_content(diacritics_prompt)
-        text_with_diacritics = diacritics_response.text.strip()
-
-        # Save to database
-        text_record = Text(
-            title=f"نص مولد - الصف {grade_level}",
-            content=generated_text,
-            content_with_diacritics=text_with_diacritics,
+        # Build query for database texts
+        query = Text.query.filter_by(
             grade_level=grade_level,
-            difficulty_level=difficulty_level,
-            category=topic,
-            word_count=len(generated_text.split())
+            difficulty_level=difficulty_level
         )
 
-        db.session.add(text_record)
-        db.session.commit()
+        # Add topic filter if specified
+        if topic and topic != 'عام':
+            query = query.filter(Text.category.ilike(f'%{topic}%'))
+
+        # Get all matching texts
+        available_texts = query.all()
+
+        if not available_texts:
+            # Fallback: try without topic filter
+            available_texts = Text.query.filter_by(
+                grade_level=grade_level,
+                difficulty_level=difficulty_level
+            ).all()
+
+        if not available_texts:
+            return jsonify({
+                'success': False,
+                'message': 'لا توجد نصوص متاحة للمعايير المحددة',
+                'suggestion': 'Run python populate_texts.py to generate educational texts',
+                'fallback_available': True
+            }), 404
+
+        # Select a random text from available options
+        import random
+        selected_text = random.choice(available_texts)
 
         return jsonify({
             'success': True,
             'text': {
-                'id': text_record.id,
-                'title': text_record.title,
-                'content': generated_text,
-                'content_with_diacritics': text_with_diacritics,
-                'grade_level': grade_level,
-                'difficulty_level': difficulty_level,
-                'word_count': text_record.word_count
-            }
+                'id': selected_text.id,
+                'title': selected_text.title,
+                'content': selected_text.content,
+                'content_with_diacritics': selected_text.content,  # Could be enhanced
+                'grade_level': selected_text.grade_level,
+                'difficulty_level': selected_text.difficulty_level,
+                'category': selected_text.category,
+                'word_count': selected_text.word_count
+            },
+            'source': 'database',
+            'generation_method': 'pre_generated',
+            'available_alternatives': len(available_texts),
+            'message': f'تم اختيار نص من {len(available_texts)} نص متاح'
         })
 
     except Exception as e:
-        logger.error(f"Error generating Arabic text: {e}")
-        # Return fallback text on error
-        generated_text = get_fallback_text(grade_level, difficulty_level)
-        text_with_diacritics = add_diacritics_to_text(generated_text)
-
-        # Save fallback text
-        text_record = Text(
-            title=f"نص تجريبي - الصف {grade_level}",
-            content=generated_text,
-            content_with_diacritics=text_with_diacritics,
-            grade_level=grade_level,
-            difficulty_level=difficulty_level,
-            category=topic,
-            word_count=len(generated_text.split())
-        )
-
-        db.session.add(text_record)
-        db.session.commit()
-
+        logger.error(f"Error in text generation: {e}")
         return jsonify({
-            'success': True,
-            'text': {
-                'id': text_record.id,
-                'title': text_record.title,
-                'content': generated_text,
-                'content_with_diacritics': text_with_diacritics,
-                'grade_level': grade_level,
-                'difficulty_level': difficulty_level,
-                'word_count': text_record.word_count
-            }
-        })
+            'success': False,
+            'message': f'خطأ في توليد النص: {str(e)}'
+        }), 500
 
 def get_fallback_text(grade_level: int, difficulty_level: str) -> str:
     """Get a pre-defined fallback text based on grade level and difficulty"""
@@ -1261,7 +889,120 @@ if __name__ == '__main__':
 
     # Use SocketIO run instead of app.run for WebSocket support
     socketio.run(app, host='0.0.0.0', port=5001, debug=True)
-# Initialize real-time processor
-from services.realtime_processor import RealTimeAudioProcessor
-realtime_processor = RealTimeAudioProcessor(
-    speech_recognizer, assessment_engine, feedback_generator, learning_system)
+
+@app.route('/api/texts/generate-from-db', methods=['POST'])
+def generate_text_from_database():
+    """Get a random educational text from the database instead of RAG generation"""
+    try:
+        data = request.get_json()
+
+        # Extract parameters
+        grade_level = data.get('grade_level', 1)
+        difficulty_level = data.get('difficulty_level', 'easy')
+        topic = data.get('topic', None)  # Optional topic filter
+
+        logger.info(f"Fetching text from database: grade={grade_level}, difficulty={difficulty_level}, topic={topic}")
+
+        # Validate parameters
+        if grade_level not in range(1, 7):
+            return jsonify({
+                'success': False,
+                'error': 'Grade level must be between 1 and 6'
+            }), 400
+
+        if difficulty_level not in ['easy', 'medium', 'hard']:
+            return jsonify({
+                'success': False,
+                'error': 'Difficulty must be easy, medium, or hard'
+            }), 400
+
+        # Build query
+        query = Text.query.filter_by(
+            grade_level=grade_level,
+            difficulty_level=difficulty_level
+        )
+
+        # Add topic filter if specified
+        if topic:
+            query = query.filter(Text.category.ilike(f'%{topic}%'))
+
+        # Get all matching texts
+        available_texts = query.all()
+
+        if not available_texts:
+            return jsonify({
+                'success': False,
+                'error': 'No texts found for the specified criteria',
+                'suggestion': 'Try different grade level or difficulty, or run populate_texts.py to generate texts'
+            }), 404
+
+        # Select a random text
+        import random
+        selected_text = random.choice(available_texts)
+
+        return jsonify({
+            'success': True,
+            'text': selected_text.content,
+            'text_id': selected_text.id,
+            'title': selected_text.title,
+            'word_count': selected_text.word_count,
+            'category': selected_text.category,
+            'grade_level': selected_text.grade_level,
+            'difficulty_level': selected_text.difficulty_level,
+            'source': 'database',
+            'available_texts_count': len(available_texts),
+            'message': f'تم اختيار نص من {len(available_texts)} نص متاح'
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching text from database: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'خطأ في جلب النص من قاعدة البيانات'
+        }), 500
+
+@app.route('/api/texts/stats', methods=['GET'])
+def get_text_statistics():
+    """Get statistics about available texts in the database"""
+    try:
+        stats = {
+            'total_texts': Text.query.count(),
+            'by_grade': {},
+            'by_difficulty': {},
+            'by_category': {}
+        }
+
+        # Statistics by grade level
+        for grade in range(1, 7):
+            grade_count = Text.query.filter_by(grade_level=grade).count()
+            stats['by_grade'][f'grade_{grade}'] = grade_count
+
+        # Statistics by difficulty
+        for difficulty in ['easy', 'medium', 'hard']:
+            diff_count = Text.query.filter_by(difficulty_level=difficulty).count()
+            stats['by_difficulty'][difficulty] = diff_count
+
+        # Statistics by category (simplified)
+        all_texts = Text.query.all()
+        category_counts = {}
+        for text in all_texts:
+            if text.category:
+                category_counts[text.category] = category_counts.get(text.category, 0) + 1
+
+        # Get top 10 categories
+        sorted_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        stats['by_category'] = dict(sorted_categories)
+
+        return jsonify({
+            'success': True,
+            'statistics': stats,
+            'message': f'قاعدة البيانات تحتوي على {stats["total_texts"]} نص تعليمي'
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting text statistics: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
